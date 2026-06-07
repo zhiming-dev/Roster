@@ -36,4 +36,4 @@ def new_run_id() -> str:
 
 
 def runs_dir() -> Path:
-    return Path(os.environ.get("CONCLAVE_RUNS_DIR", "../runs")).resolve()
+    return Path(os.environ.get("ROSTER_RUNS_DIR") or os.environ.get("CONCLAVE_RUNS_DIR", "../runs")).resolve()

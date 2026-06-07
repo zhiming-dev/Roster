@@ -1,4 +1,4 @@
-# Pre-Registration — Conclave Study (TEMPLATE)
+# Pre-Registration — Roster Study (TEMPLATE)
 
 > Fill this out **before** running any scored experiments. Commit the filled version to
 > `research/preregistration.v<n>.md`. Changes after the freeze must add a dated amendment

@@ -18,7 +18,7 @@ from .bus import bus
 from .orchestrator import Run
 from .providers import ProviderError
 
-log = logging.getLogger("conclave.server")
+log = logging.getLogger("roster.server")
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
 
@@ -27,7 +27,7 @@ _run_lock = asyncio.Lock()
 
 
 def _get_config_path() -> str:
-    return os.environ.get("CONCLAVE_CONFIG", "agents.config.yaml")
+    return os.environ.get("ROSTER_CONFIG") or os.environ.get("CONCLAVE_CONFIG", "agents.config.yaml")
 
 
 async def _ensure_run() -> Run:
@@ -76,7 +76,7 @@ async def lifespan(app: FastAPI):
             await _run.aclose()
 
 
-app = FastAPI(title="Conclave Runtime", lifespan=lifespan)
+app = FastAPI(title="Roster Runtime", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 

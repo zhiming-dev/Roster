@@ -7,7 +7,8 @@ serialize agents that share one backend / API key.
 
 Secrets are never written inline in the YAML in production: any string may reference an
 environment variable with `${VAR}` or `${VAR:-default}` syntax, which is expanded at load
-time. Per-agent overrides are also available via `CONCLAVE_<AGENT>_<FIELD>` env vars.
+time. Per-agent overrides are available via `ROSTER_<AGENT>_<FIELD>` env vars, with
+legacy `CONCLAVE_<AGENT>_<FIELD>` still accepted for compatibility.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from typing import Any
 
 import yaml
 
-log = logging.getLogger("conclave.config")
+log = logging.getLogger("roster.config")
 
 # ${VAR} or ${VAR:-default}
 _ENV_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-(.*?))?\}")
@@ -144,7 +145,9 @@ def _parse_agent_md(path: Path) -> tuple[dict[str, Any], str]:
 
 
 def _env_override(agent: str, field_name: str, fallback: Any) -> Any:
-    return os.environ.get(f"CONCLAVE_{agent.upper()}_{field_name.upper()}", fallback)
+    roster_key = f"ROSTER_{agent.upper()}_{field_name.upper()}"
+    legacy_key = f"CONCLAVE_{agent.upper()}_{field_name.upper()}"
+    return os.environ.get(roster_key, os.environ.get(legacy_key, fallback))
 
 
 def _build_provider(name: str, merged: dict[str, Any]) -> ProviderConfig:

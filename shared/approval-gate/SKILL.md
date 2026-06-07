@@ -6,7 +6,7 @@ argument-hint: 'An ActionProposal JSON path or inline object. Optional: --policy
 
 # Approval Gate Skill
 
-The approval gate is the structural mechanism by which Conclave **decouples decision from
+The approval gate is the structural mechanism by which Roster **decouples decision from
 enactment**. Every agent calls this skill before any action that touches the environment.
 
 ## When to use

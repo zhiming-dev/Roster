@@ -46,6 +46,6 @@ Could not verify: <list, or "nothing material">
 
 ## Status
 
-🌐 **Live in the runtime.** This is the first Conclave agent with a real tool wired up
+🌐 **Live in the runtime.** This is the first Roster agent with a real tool wired up
 (web search via the runtime's search provider — DuckDuckGo by default, Tavily if a key is
 configured). It still has no file-system or code-execution tools.

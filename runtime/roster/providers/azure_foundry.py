@@ -29,7 +29,7 @@ import httpx
 from ..config import ProviderConfig
 from .base import Provider, ProviderError, merged_options
 
-log = logging.getLogger("conclave.providers.azure_foundry")
+log = logging.getLogger("roster.providers.azure_foundry")
 
 _DEFAULT_API_VERSION = "2024-05-01-preview"
 

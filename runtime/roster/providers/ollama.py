@@ -10,7 +10,7 @@ import httpx
 from ..config import ProviderConfig
 from .base import Provider, ProviderError, merged_options
 
-log = logging.getLogger("conclave.providers.ollama")
+log = logging.getLogger("roster.providers.ollama")
 
 
 class OllamaProvider:

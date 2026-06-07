@@ -6,7 +6,7 @@ argument-hint: 'A goal string or path to runs/<runId>/goal.md. Optional flags: -
 
 # Planner Runner
 
-The Planner is the only agent in Conclave that **plans but does not enact**. This skill
+The Planner is the only agent in Roster that **plans but does not enact**. This skill
 defines how you (the Planner) turn a goal into a ratifiable plan, dispatch it, supervise
 execution, and close the run.
 

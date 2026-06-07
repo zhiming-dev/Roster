@@ -21,7 +21,7 @@ from .providers import Provider, build_provider
 from .queue import LlmQueue, QueueStats
 from .search import SearchError, SearchProvider, format_results
 
-log = logging.getLogger("conclave.agent")
+log = logging.getLogger("roster.agent")
 
 # A tool call the model emits as the LAST line of a reply, mirroring DISPATCH:.
 SEARCH_RE = re.compile(r"^\s*SEARCH\s*:\s*(?P<query>.+?)\s*$", re.IGNORECASE)

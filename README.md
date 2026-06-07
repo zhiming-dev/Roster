@@ -1,4 +1,4 @@
-# Conclave
+# Roster
 
 > A **human-in-the-loop, hierarchical multi-agent framework** for software-engineering and
 > workflow-automation tasks — organized like a small company, with mandatory human ratification
@@ -14,7 +14,7 @@ Specification: [`conclave-spec.md`](./conclave-spec.md)
 
 Fully autonomous LLM agents couple **decision** and **enactment** with no ratification step.
 The canonical failure mode is the agent that, after one misread prompt, drops a production database
-in nine seconds. Conclave addresses this with two structural commitments:
+in nine seconds. Roster addresses this with two structural commitments:
 
 1. **Decouple decision from enactment.** Irreversible actions are *proposed*, not *performed*, until
    a human ratifies them. Low-risk / reversible actions still flow autonomously so the human is not
@@ -47,7 +47,7 @@ flowchart LR
 ## Repository layout
 
 ```
-Agency/                              ← repo root (project name TBD, see spec §16)
+Roster/                              ← repo root
 ├── README.md                        ← you are here
 ├── AGENTS.md                        ← entry point for any LLM coding agent reading the repo
 ├── conclave-spec.md                 ← full engineering + research specification
@@ -74,7 +74,7 @@ Agency/                              ← repo root (project name TBD, see spec �
 ├── researcher-agent/                ← 🌐 web search + source-cited synthesis (first real tool)
 │
 ├── runtime/                         ← MVP Python execution layer (FastAPI + Ollama + dashboard)
-│   ├── conclave/                    ← orchestrator, provider abstraction, event bus, provenance
+│   ├── roster/                      ← orchestrator, provider abstraction, event bus, provenance
 │   ├── static/dashboard.html        ← live dashboard: agent cards, principal chat, event feed
 │   └── agents.config.yaml           ← per-agent model/provider binding
 │
@@ -102,7 +102,7 @@ Agency/                              ← repo root (project name TBD, see spec �
 
 ## How a run works (today, on top of a markdown-agent IDE)
 
-Conclave is intentionally markdown-first: every agent is a `*.agent.md` file with a `SKILL.md`,
+Roster is intentionally markdown-first: every agent is a `*.agent.md` file with a `SKILL.md`,
 loadable by any agent IDE (VS Code Copilot, Claude Code, Cursor, etc.). A run lives entirely
 on disk under `runs/<run-id>/` so it is grep-able, diffable, and replayable.
 
@@ -123,7 +123,7 @@ See [`examples/forgot-password-flow/`](./examples/forgot-password-flow/) for a c
 ## Quickstart (for contributors)
 
 ```bash
-git clone <this-repo> conclave && cd conclave
+git clone <this-repo> Roster && cd Roster
 
 # Read the spec and the agent entry point
 $EDITOR conclave-spec.md AGENTS.md
@@ -144,7 +144,7 @@ cd runtime
 python -m venv .venv ; .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 ollama pull llama3.1:8b
-python -m conclave
+python -m roster
 # open http://localhost:8765/
 ```
 
@@ -168,7 +168,7 @@ do not control for compute).
 
 ## Trustworthy-AI framing
 
-Conclave operationalizes the **safety and controllability** dimension of trustworthy AI for the
+Roster operationalizes the **safety and controllability** dimension of trustworthy AI for the
 emerging class of autonomous LLM agents:
 
 - Mandatory human approval gates on irreversible action.

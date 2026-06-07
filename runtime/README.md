@@ -1,6 +1,6 @@
-# Conclave runtime — MVP
+# Roster runtime — MVP
 
-A small Python service that turns the markdown-first Conclave agents (Planner, Coder,
+A small Python service that turns the markdown-first Roster agents (Planner, Coder,
 E2E, QA/Validation, Reviewer, Researcher) into **actual running processes** backed by a
 local Ollama daemon or Azure AI Foundry, and exposes:
 
@@ -46,7 +46,7 @@ pip install -r requirements.txt
 ## 3. Run
 
 ```powershell
-python -m conclave
+python -m roster
 ```
 
 Then open <http://localhost:8765/>.
@@ -91,8 +91,8 @@ prefixed with `[<role> reports]:`.
 runtime/
 ├── agents.config.yaml          ← SINGLE centralized config (providers + queue)
 ├── requirements.txt
-├── conclave/
-│   ├── __main__.py             ← `python -m conclave` entry point
+├── roster/
+│   ├── __main__.py             ← `python -m roster` entry point
 │   ├── config.py               ← loads YAML, expands ${ENV} secrets, parses .agent.md
 │   ├── logging_setup.py        ← structured logging config
 │   ├── queue.py                ← observable shared LLM queue (RequireQueue)
@@ -111,7 +111,7 @@ runtime/
 ```
 
 > The `researcher` agent (in [`../researcher-agent/`](../researcher-agent/)) is the first
-> Conclave agent with a real tool wired up — web search. The planner dispatches
+> Roster agent with a real tool wired up — web search. The planner dispatches
 > live/external-fact questions to it instead of guessing.
 
 ## 6. Configuration
@@ -153,7 +153,7 @@ the API):
 
 ```powershell
 $env:AZURE_FOUNDRY_API_KEY = "<your-key>"
-python -m conclave
+python -m roster
 ```
 
 The URL convention is auto-detected: `*.openai.azure.com` uses the Azure OpenAI
@@ -218,12 +218,12 @@ to never fabricate when search returns nothing.
 Without editing the file:
 
 ```powershell
-$env:CONCLAVE_PLANNER_PROVIDER = "azure_foundry"
-$env:CONCLAVE_PLANNER_ENDPOINT = "https://r.services.ai.azure.com"
-$env:CONCLAVE_PLANNER_DEPLOYMENT = "gpt-4o-mini"
-$env:CONCLAVE_PLANNER_API_KEY = "<key>"
-$env:CONCLAVE_CODER_MODEL = "qwen2.5-coder:7b"
-python -m conclave
+$env:ROSTER_PLANNER_PROVIDER = "azure_foundry"
+$env:ROSTER_PLANNER_ENDPOINT = "https://r.services.ai.azure.com"
+$env:ROSTER_PLANNER_DEPLOYMENT = "gpt-4o-mini"
+$env:ROSTER_PLANNER_API_KEY = "<key>"
+$env:ROSTER_CODER_MODEL = "qwen2.5-coder:7b"
+python -m roster
 ```
 
 ## 7. Provenance
@@ -260,7 +260,7 @@ Almost always one of:
    per-agent) to truncate.
 
 The runtime now serializes **all** Ollama calls per endpoint (process-wide async
-lock in [`conclave/agent.py`](./conclave/agent.py)), so even if multiple chat
+lock in [`roster/agent.py`](./roster/agent.py)), so even if multiple chat
 requests overlap, only one inference runs at a time. This is the single most
 important safeguard against thrash on a local machine.
 

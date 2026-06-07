@@ -1,10 +1,8 @@
-# Conclave — A Human-in-the-Loop Multi-Agent Framework for Software Engineering & Workflow Automation
+# Roster — A Human-in-the-Loop Multi-Agent Framework for Software Engineering & Workflow Automation
 
-> **Working name:** *Conclave* (placeholder — see [§16](#16-naming--branding)).
-> A "conclave" is a deliberative body that meets under a presiding authority and whose
-> decisions are ratified rather than self-enacting. That is exactly the relationship this
-> system models: a council of specialized AI agents deliberates and proposes, a presiding
-> planner organizes the work, and a **human principal ratifies** before anything irreversible happens.
+> **Project name:** *Roster*.
+> The system models a coordinated team of specialized AI agents whose work is organized by a
+> presiding planner and ratified by a human principal before anything irreversible happens.
 
 | Field | Value |
 |---|---|
@@ -12,14 +10,14 @@
 | **Status** | Draft v0.1 — Phase 1 (QA sub-agent) implemented; Phase 2 (multi-agent) in design |
 | **Owner** | *(you)* |
 | **Audience** | Contributors, collaborators, reviewers, prospective open-source users |
-| **License (intended)** | Apache-2.0 or MIT (permissive, US-researcher/startup/SMB friendly) |
+| **License** | MIT |
 | **Relationship to employment** | Independent open-source R&D conducted outside the scope of the author's employment responsibilities at Microsoft. Originated from exploratory prototyping during an internal hackathon; continues as an independent effort. Findings and tooling to be released publicly via GitHub and peer-reviewed publication. |
 
 ---
 
 ## Table of Contents
 
-- [Conclave — A Human-in-the-Loop Multi-Agent Framework for Software Engineering \& Workflow Automation](#conclave--a-human-in-the-loop-multi-agent-framework-for-software-engineering--workflow-automation)
+- [Roster — A Human-in-the-Loop Multi-Agent Framework for Software Engineering \& Workflow Automation](#roster--a-human-in-the-loop-multi-agent-framework-for-software-engineering--workflow-automation)
   - [Table of Contents](#table-of-contents)
   - [1. TL;DR / Abstract](#1-tldr--abstract)
   - [2. Motivation \& Problem Statement](#2-motivation--problem-statement)
@@ -70,7 +68,7 @@
 
 ## 1. TL;DR / Abstract
 
-Conclave is a **hierarchical, human-in-the-loop (HITL) multi-agent framework** for autonomous
+Roster is a **hierarchical, human-in-the-loop (HITL) multi-agent framework** for autonomous
 software-engineering and workflow-automation tasks. The system is organized like a small company:
 
 - A **Planner (a.k.a. PM / "Master") agent** performs the highest level of design — it decomposes a
@@ -109,7 +107,7 @@ By the time a human notices, the action is done and may be unrecoverable.
 
 ### 2.2 Two structural ideas
 
-Conclave addresses this with two structural commitments:
+Roster addresses this with two structural commitments:
 
 1. **Decouple decision from enactment via approval gates.** Irreversible actions are *proposed*, not
    *performed*, until a human ratifies them. Reversible / low-blast-radius actions can proceed
@@ -124,12 +122,12 @@ Conclave addresses this with two structural commitments:
 A complementary observation motivates the **Council** layer. In practice, a skilled human working on a
 hard problem will often pose it to several models (Claude, GPT, Gemini), notice where they agree, disagree,
 or emphasize different things, and shuttle the answers back and forth until a stronger synthesis emerges.
-Conclave formalizes this as an explicit, logged deliberation protocol available to the planner for
+Roster formalizes this as an explicit, logged deliberation protocol available to the planner for
 high-uncertainty or high-stakes decisions.
 
 > **Important nuance (from the literature, see [§10](#10-related-work)):** multi-agent debate is *not*
 > uniformly beneficial. It can collapse into mere ensembling, and majority pressure can suppress a correct
-> minority. Conclave therefore treats the Council as an *opt-in tool for specific decision classes*, and the
+> minority. Roster therefore treats the Council as an *opt-in tool for specific decision classes*, and the
 > research plan is explicitly designed to measure when it helps versus when it hurts.
 
 ### 2.4 Why this is worth publishing
@@ -160,7 +158,7 @@ is a genuine contribution rather than a re-tread.
 ### 3.2 Non-Goals (v1)
 
 - **Not** a fully autonomous "fire-and-forget" agent. HITL is a feature, not a limitation to be removed.
-- **Not** a model-training project. Conclave orchestrates existing frontier/open models; it does not train them.
+- **Not** a model-training project. Roster orchestrates existing frontier/open models; it does not train them.
 - **Not** a general-purpose RPA/GUI-automation product (though the QA sub-agent uses browser automation).
 - **Not** a benchmark of raw model quality. The study controls for the underlying model; the *unit of
   comparison is the architecture*.
@@ -634,7 +632,7 @@ per-task and per-token.
 **Multi-agent "virtual company" frameworks.** AutoGen (Wu et al., 2024) provides conversable agents with
 flexible group-chat and human-in-the-loop patterns; MetaGPT (Hong et al., 2023) and ChatDev (Qian et al.,
 2023) simulate software companies with PM/engineer/reviewer/tester roles; CAMEL (Li et al., 2023) and
-AgentVerse explore role-play and emergent collaboration. Conclave's "company" structure is in this lineage
+AgentVerse explore role-play and emergent collaboration. Roster's "company" structure is in this lineage
 but foregrounds *mandatory human ratification of irreversible actions* and *capability-scoped least
 privilege*, which these frameworks largely leave to the developer.
 
@@ -647,7 +645,7 @@ privilege*, which these frameworks largely leave to the developer.
   single-agent context utilization.
 - *"Single-agent or Multi-agent Systems? Why Not Both?" (arXiv:2505.18286).* An empirical study across
   agentic applications finding **multi-agent benefits diminish as model capability improves**, plus a hybrid
-  cascading design. Directly motivates Conclave's RQ5.
+  cascading design. Directly motivates Roster's RQ5.
 - *Google Research scaling study.* Reports a striking **asymmetry: large gains on parallelizable tasks,
   significant degradation on sequential tasks** from multi-agent coordination — motivating the planner's
   parallel-vs-sequential routing policy (§8.4).
@@ -655,23 +653,23 @@ privilege*, which these frameworks largely leave to the developer.
 **Why multi-agent systems fail.** *Cemri et al. (2025), "Why Do Multi-Agent LLM Systems Fail?"* builds a
 large annotated corpus of failing traces and a taxonomy of failure modes spanning system design, inter-agent
 misalignment, and verification failures — i.e., failures are **predictable and tied to architecture**, not
-random. This informs Conclave's evaluation oracles and the safety metrics in §9.3.
+random. This informs Roster's evaluation oracles and the safety metrics in §9.3.
 
 **Is debate real deliberation?** *Wu, Li & Li (2025), "Can LLM Agents Really Debate?"* finds that
 multi-agent debate is driven mostly by intrinsic reasoning strength and group diversity, that structural
 debate parameters add little, and — importantly — that **majority pressure can suppress a correct minority**.
 The foundational multi-agent-debate result is *Du et al. (2023), "Improving Factuality and Reasoning in
-Language Models through Multiagent Debate."* Together these motivate Conclave's anti-conformity safeguards
+Language Models through Multiagent Debate."* Together these motivate Roster's anti-conformity safeguards
 (§8.3) and RQ4.
 
 **Human-in-the-loop & controllability tooling.** HITL is now a first-class pattern in production frameworks
 (e.g., LangGraph's interrupt/resume model; HumanLayer-style async approvals). Best-practice guidance
 converges on: gate the *destructive* actions specifically, delegate approval logic to a versioned policy
-engine, summarize (don't dump) approval requests, and treat audit trails as part of the loop. Conclave
+engine, summarize (don't dump) approval requests, and treat audit trails as part of the loop. Roster
 adopts these and adds the **reversibility-aware risk tiering** and **recoverability preconditions** in §6.4/§6.7.
 
 **Ecosystem note.** The framework landscape is shifting (e.g., Microsoft moved AutoGen to maintenance with
-community/vendor successors emerging). Conclave's model- and framework-agnostic design (§5.3) is partly a
+community/vendor successors emerging). Roster's model- and framework-agnostic design (§5.3) is partly a
 hedge against this churn.
 
 *(Full BibTeX to be maintained in `/docs/references.bib`. Verify arXiv IDs and venues before submission;
@@ -681,7 +679,7 @@ several of the above are recent preprints.)*
 
 ## 11. Safety & Trustworthy-AI Framing
 
-Conclave operationalizes the **safety and controllability** dimension of trustworthy AI for the emerging
+Roster operationalizes the **safety and controllability** dimension of trustworthy AI for the emerging
 class of autonomous LLM agents. The contributions to AI auditability and human-centered control are
 intrinsic to the design, not bolted on:
 
@@ -718,7 +716,7 @@ asserted.
 ## 13. Repository Layout
 
 ```
-conclave/
+roster/
 ├── README.md
 ├── LICENSE                      # Apache-2.0 / MIT
 ├── docs/
@@ -778,7 +776,7 @@ conclave/
 
 ## 16. Naming & Branding
 
-*Conclave* is a placeholder chosen for the "deliberative body ratified by a presiding authority" metaphor.
+*Roster* is the adopted project name for this framework.
 Alternatives to consider: **Atrium**, **Praxis**, **Bureau**, **Concord**, **Quorum**, **Steward**,
 **Ratify**. Pick something not already a major framework name and with an available GitHub org + package
 namespace.
@@ -821,7 +819,7 @@ A worked example of a single run, end to end.
    ratified plan and the original goal.
 
 *Contrast (the failure this prevents):* a fully autonomous super-agent, asked to "clean up stale tokens,"
-issues `DELETE FROM password_resets;` (no `WHERE`), wiping all tokens before any human sees it. In Conclave,
+issues `DELETE FROM password_resets;` (no `WHERE`), wiping all tokens before any human sees it. In Roster,
 that action is **T4**, requires a backup precondition, surfaces a dry-run diff showing the full-table
 deletion, and stops for human ratification — where the missing `WHERE` is caught.
 

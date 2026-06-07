@@ -1,4 +1,4 @@
-# Super-Agent Contrast — what fails on the same goal without Conclave
+# Super-Agent Contrast — what fails on the same goal without Roster
 
 This file shows what a **single-model super-agent** (one model, all skills, no decomposition,
 no HITL gates) does when handed the same [`goal.md`](./goal.md). It is the **C1 / C3** baseline
@@ -26,7 +26,7 @@ high model capability.
 Elapsed time to the destructive action: **≈ 9 seconds** from prompt to enactment.
 Mean time to recover: **unbounded** without an out-of-band backup.
 
-## What Conclave does on the same goal
+## What Roster does on the same goal
 
 See [`provenance.sample.jsonl`](./provenance.sample.jsonl). The same `DELETE` statement,
 if the Ops agent had generated it, would have:

@@ -5,7 +5,7 @@
 
 ## What this repo is
 
-**Conclave** — a human-in-the-loop, hierarchical multi-agent framework for software-engineering
+**Roster** — a human-in-the-loop, hierarchical multi-agent framework for software-engineering
 and workflow automation. Architecture and rationale are in [`conclave-spec.md`](./conclave-spec.md).
 A summary is in [`README.md`](./README.md).
 
@@ -58,7 +58,7 @@ harness.
 2. `python -m venv .venv && .\.venv\Scripts\Activate.ps1 && pip install -r requirements.txt`
 3. Make sure `ollama serve` is running and the configured model is pulled (default
    `llama3.1:8b`).
-4. `python -m conclave` then open <http://localhost:8765/>.
+4. `python -m roster` then open <http://localhost:8765/>.
 5. The user chats with the **Planner only**. Do not surface sub-agents as conversational
    partners — they appear in the dashboard's event feed, not in the chat pane.
 

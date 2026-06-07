@@ -19,7 +19,7 @@ import httpx
 
 from .config import SearchConfig
 
-log = logging.getLogger("conclave.search")
+log = logging.getLogger("roster.search")
 
 
 @dataclass

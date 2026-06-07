@@ -1,4 +1,4 @@
-# Contributing to Conclave
+# Contributing to Roster
 
 Thanks for your interest. This is an open R&D project — issues, PRs, and study
 collaborations are all welcome.
@@ -23,7 +23,7 @@ collaborations are all welcome.
 
 - Removing the human-in-the-loop gate. HITL is a feature, not a limitation
   (see [`conclave-spec.md` §3.2](./conclave-spec.md)).
-- Model-training PRs. Conclave orchestrates frontier/open models; it does not train them.
+- Model-training PRs. Roster orchestrates frontier/open models; it does not train them.
 - Vendor-specific lock-in. Agents must remain bindable to any model interface.
 
 ## Ground rules

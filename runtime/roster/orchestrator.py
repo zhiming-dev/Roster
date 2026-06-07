@@ -15,7 +15,7 @@ from .provenance import ProvenanceLog, new_run_id, runs_dir
 from .queue import LlmQueue
 from .search import SearchProvider, build_search_provider
 
-log = logging.getLogger("conclave.orchestrator")
+log = logging.getLogger("roster.orchestrator")
 
 DISPATCH_RE = re.compile(
     r"^\s*DISPATCH\s*:\s*(?P<role>[a-z_][a-z0-9_-]*)\s*:\s*(?P<task>.+?)\s*$",
@@ -48,9 +48,9 @@ def runtime_preamble() -> str:
 
 
 PLANNER_RUNTIME_HEAD = """\
-## Runtime protocol (Conclave MVP)
+## Runtime protocol (Roster MVP)
 
-You are running inside the Conclave runtime. You speak to the human principal directly.
+You are running inside the Roster runtime. You speak to the human principal directly.
 The specialist sub-agents below are available; you dispatch to them when their expertise
 is needed. The runtime — not you — actually invokes them.
 
@@ -123,9 +123,9 @@ Hard rules:
 
 
 _SUBAGENT_HEAD = """\
-## Runtime protocol (Conclave MVP)
+## Runtime protocol (Roster MVP)
 
-You are running inside the Conclave runtime as a specialist sub-agent. The Planner has
+You are running inside the Roster runtime as a specialist sub-agent. The Planner has
 dispatched a single task to you. Your reply goes back to the Planner, not to the human
 principal. Be concise and structured:
 

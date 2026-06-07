@@ -12,9 +12,18 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+runtime/.venv/
 dist/
 build/
 *.egg-info/
+*.log
+
+# Test / coverage / notebook artifacts
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.ipynb_checkpoints/
 
 # Playwright CLI working directories (regeneratable)
 .playwright-cli/
@@ -38,3 +47,7 @@ research/.cache/
 # The committed template is runtime/agents.config.example.yaml (kept below).
 *agents.config.yaml
 !*agents.config.example.yaml
+
+# Runtime/editor local state
+runtime/.mypy_cache/
+runtime/.ruff_cache/

@@ -7,7 +7,7 @@ argument-hint: 'A ProvenanceEvent JSON object (must validate against shared/sche
 # Provenance Skill
 
 The provenance log is the **backbone of auditability and the research harness.** A run is
-defined by its log: anything not in the log effectively did not happen as far as Conclave is
+defined by its log: anything not in the log effectively did not happen as far as Roster is
 concerned.
 
 ## File layout

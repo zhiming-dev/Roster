@@ -1,5 +1,5 @@
 # =============================================================================
-# Conclave runtime — EXAMPLE config (safe to commit).
+# Roster runtime — EXAMPLE config (safe to commit).
 #
 # Copy this file to `agents.config.yaml` and edit it with your real endpoints /
 # keys. The live `agents.config.yaml` is gitignored so secrets never land in
@@ -21,8 +21,8 @@
 # Secrets: any value may reference an env var as ${VAR} or ${VAR:-default};
 # expanded when the config loads. Per-agent env overrides also work without
 # editing this file:
-#   CONCLAVE_<AGENT>_PROVIDER / _ENDPOINT / _MODEL / _DEPLOYMENT / _API_KEY
-#   e.g.  $env:CONCLAVE_PLANNER_MODEL = "llama3.1:8b"
+#   ROSTER_<AGENT>_PROVIDER / _ENDPOINT / _MODEL / _DEPLOYMENT / _API_KEY
+#   e.g.  $env:ROSTER_PLANNER_MODEL = "llama3.1:8b"
 #
 # This template defaults to a local Ollama so a fresh clone runs with no keys:
 #   ollama pull tinyllama:latest

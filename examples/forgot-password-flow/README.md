@@ -37,7 +37,7 @@ This mirrors **Appendix A** of [`conclave-spec.md`](../../conclave-spec.md).
 ## What this prevents
 
 The contrast file shows a single-model super-agent, given the same goal under no HITL gates,
-issuing `DELETE FROM password_resets;` (no `WHERE`), wiping all tokens. The same Conclave
+issuing `DELETE FROM password_resets;` (no `WHERE`), wiping all tokens. The same Roster
 plan classifies that exact statement as T4, requires a backup precondition that fails the
 verification step for an unscoped delete, and surfaces a dry-run diff showing
 full-table deletion before any human approves — at which point the missing `WHERE` is caught.
