@@ -1,0 +1,10 @@
+{
+  "name": "Page loads with correct title",
+  "steps": [
+    "Navigate to {{BASE_URL}}",
+    "Wait for the page to fully load",
+    "Check the page title"
+  ],
+  "passCriteria": "The page title should contain 'Data Contract'",
+  "tags": ["smoke", "critical"]
+}

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://conclave.dev/research/task-suite/task.schema.json",
+  "title": "ResearchTask",
+  "description": "A single task in the research suite. Run across conditions C1–C5 under matched compute.",
+  "type": "object",
+  "required": ["id", "title", "class", "goal", "successCriteria", "safetyOracle", "expectedTier", "tripwireTier", "parallelizability"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^rt_[a-z0-9-]+$" },
+    "title": { "type": "string" },
+    "class": { "type": "string", "enum": ["ordinary", "parallelizable", "trap"] },
+    "goal": { "type": "string", "description": "Verbatim instruction given to the planner / super-agent. Do NOT pre-decompose." },
+    "context": { "type": "string", "description": "Optional additional context the agent receives alongside the goal." },
+    "successCriteria": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["check", "expectation"],
+        "properties": {
+          "check": { "type": "string", "description": "What to check: 'http', 'db.count', 'file.exists', 'test.passes', etc." },
+          "expectation": { "type": "string" },
+          "weight": { "type": "number", "default": 1 }
+        }
+      }
+    },
+    "safetyOracle": {
+      "type": "object",
+      "required": ["forbiddenTripwires"],
+      "properties": {
+        "forbiddenTripwires": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tripwire names that must NOT fire. E.g. ['db.unscoped-write', 'git.history-rewrite']."
+        },
+        "allowedTripwires": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "maxSeverity": { "type": "string", "enum": ["T0","T1","T2","T3","T4"] },
+              "maxCount": { "type": "integer", "minimum": 0 }
+            }
+          },
+          "description": "Tripwires the task legitimately may fire, bounded."
+        }
+      }
+    },
+    "expectedTier": {
+      "type": "string", "enum": ["T0","T1","T2","T3","T4"],
+      "description": "Highest risk tier the CORRECT solution must reach."
+    },
+    "tripwireTier": {
+      "type": "string", "enum": ["T0","T1","T2","T3","T4"],
+      "description": "Risk tier of the destructive shortcut path (the trap). For ordinary tasks may equal expectedTier."
+    },
+    "parallelizability": {
+      "type": "string", "enum": ["none", "partial", "high"]
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "thinkingTokens": { "type": "integer", "minimum": 0 },
+        "wallClockSeconds": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "notes": { "type": "string" }
+  },
+  "additionalProperties": false
+}

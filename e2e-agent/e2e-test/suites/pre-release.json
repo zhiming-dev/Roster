@@ -1,0 +1,12 @@
+{
+  "name": "Pre-Release Gate",
+  "description": "Curated subset of critical + smoke tests. Run as a deployment gate.",
+  "tests": [
+    "smoke/page-loads.json",
+    "smoke/navigation-elements-visible.json",
+    "smoke/add-filter-button-present.json",
+    "navigation/navigate-all-main-pages.json",
+    "datasets/datasets-page-loads.json",
+    "contracts/my-contracts-page-loads.json"
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://conclave.dev/schemas/provenance-event.schema.json",
+  "title": "ProvenanceEvent",
+  "description": "One line in the append-only provenance log (runs/<runId>/provenance.jsonl). The log is the source of truth for auditability and the research harness; runs MUST be replayable from it. See conclave-spec.md §6.6.",
+  "type": "object",
+  "required": ["id", "runId", "t", "kind", "actor"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^evt_[A-Za-z0-9_-]+$" },
+    "runId": { "type": "string" },
+    "t": { "type": "string", "format": "date-time", "description": "ISO-8601 UTC." },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "run_started",
+        "goal_received",
+        "plan_drafted",
+        "plan_revised",
+        "approval_requested",
+        "approval_granted",
+        "approval_rejected",
+        "task_dispatched",
+        "task_started",
+        "task_result",
+        "action_proposed",
+        "action_approved",
+        "action_rejected",
+        "action_executed",
+        "action_failed",
+        "council_convened",
+        "council_proposal",
+        "council_critique",
+        "council_synthesis",
+        "snapshot_created",
+        "snapshot_verified",
+        "rollback_executed",
+        "tripwire_triggered",
+        "counterfactual_recorded",
+        "run_completed",
+        "run_aborted"
+      ]
+    },
+    "actor": {
+      "type": "string",
+      "description": "Role or identity that emitted the event."
+    },
+    "data": {
+      "type": "object",
+      "description": "Kind-specific payload. Schema is checked by the consuming tool; keep it small and structured.",
+      "additionalProperties": true
+    },
+    "causedBy": {
+      "type": "string",
+      "description": "Parent event id — every action ultimately traces back to a goal_received."
+    },
+    "counterfactual": {
+      "type": "object",
+      "description": "For safety analysis: record what WOULD have happened if the gate had been auto-allowed (and what actually happened because it wasn't).",
+      "properties": {
+        "wouldHaveExecuted": { "type": "boolean" },
+        "predictedRiskTier": { "type": "string", "enum": ["T0", "T1", "T2", "T3", "T4"] },
+        "predictedBlastRadius": { "type": "string" },
+        "actuallyExecuted": { "type": "boolean" },
+        "preventedBy": { "type": "string", "enum": ["plan_gate", "action_gate", "tripwire", "principal_veto", "none"] }
+      }
+    },
+    "tokens": {
+      "type": "object",
+      "description": "Compute accounting for matched-budget research comparisons (see spec §9.2).",
+      "properties": {
+        "input": { "type": "integer", "minimum": 0 },
+        "output": { "type": "integer", "minimum": 0 },
+        "thinking": { "type": "integer", "minimum": 0 },
+        "model": { "type": "string" }
+      }
+    }
+  },
+  "additionalProperties": false
+}

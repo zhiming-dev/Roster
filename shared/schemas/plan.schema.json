@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://conclave.dev/schemas/plan.schema.json",
+  "title": "Plan",
+  "description": "A versioned, ratifiable plan: the principal's goal decomposed into a DAG of tasks. Produced by the Planner, submitted to the Approval Gate, and the source of truth for dispatch. See conclave-spec.md §6.1.",
+  "type": "object",
+  "required": ["id", "version", "runId", "goal", "tasks", "edges", "approvalState", "createdAt"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^plan_[A-Za-z0-9_-]+$" },
+    "version": { "type": "integer", "minimum": 1 },
+    "runId": { "type": "string", "pattern": "^run_[A-Za-z0-9_-]+$" },
+    "goal": {
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string" },
+        "context": { "type": "string" },
+        "constraints": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "tasks": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "task.schema.json" }
+    },
+    "edges": {
+      "type": "array",
+      "description": "DAG dependency edges. {from} must complete before {to} may dispatch.",
+      "items": {
+        "type": "object",
+        "required": ["from", "to"],
+        "properties": {
+          "from": { "type": "string" },
+          "to":   { "type": "string" },
+          "kind": { "type": "string", "enum": ["sequence", "data", "approval"], "default": "sequence" }
+        }
+      }
+    },
+    "approvalState": {
+      "type": "string",
+      "enum": ["draft", "pending", "ratified", "rejected", "superseded"]
+    },
+    "approvalHistory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["at", "actor", "decision"],
+        "properties": {
+          "at": { "type": "string", "format": "date-time" },
+          "actor": { "type": "string" },
+          "decision": { "type": "string", "enum": ["approve", "reject", "request_changes"] },
+          "comment": { "type": "string" },
+          "diffFromVersion": { "type": "integer" }
+        }
+      }
+    },
+    "createdAt": { "type": "string", "format": "date-time" },
+    "createdBy": { "type": "string", "default": "planner" },
+    "supersedes": { "type": "string", "description": "id of the prior plan version this revision replaces" },
+    "notes": { "type": "string" }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,40 @@
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+
+# Node / Python
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Playwright CLI working directories (regeneratable)
+.playwright-cli/
+qa-agent/e2e-test/test-results/
+qa-agent/e2e-test/failure-screenshots/
+
+# Local runs (each run is principal- and machine-specific)
+runs/
+!runs/.gitkeep
+
+# Research outputs (reproducible from the harness)
+research/results/
+research/.cache/
+
+# Secrets — never commit
+.env
+.env.*
+*.pem
+*.key
+# The live runtime config holds real endpoints/keys — never commit it.
+# The committed template is runtime/agents.config.example.yaml (kept below).
+*agents.config.yaml
+!*agents.config.example.yaml

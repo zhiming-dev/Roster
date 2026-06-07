@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://conclave.dev/schemas/action-proposal.schema.json",
+  "title": "ActionProposal",
+  "description": "Emitted by a sub-agent when it wants to perform an action above its autonomous risk ceiling. The Approval Gate halts dispatch until the principal ratifies. See conclave-spec.md §6.4.",
+  "type": "object",
+  "required": ["id", "runId", "taskId", "proposedBy", "action", "riskTier", "rationale", "reversibilityPlan", "recoverabilityState", "proposedAt"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^prop_[A-Za-z0-9_-]+$" },
+    "runId": { "type": "string" },
+    "taskId": { "type": "string" },
+    "proposedBy": {
+      "type": "string",
+      "enum": ["qa", "coder", "reviewer", "researcher", "ops", "data", "planner"]
+    },
+    "action": {
+      "type": "object",
+      "required": ["kind", "summary"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "description": "Canonical action type, e.g. 'git.merge', 'db.execute', 'fs.delete', 'http.post', 'deploy.staging'."
+        },
+        "summary": { "type": "string", "description": "Single-sentence human-readable summary." },
+        "target": { "type": "string", "description": "What the action operates on (URL, path, table, env)." },
+        "command": { "type": "string", "description": "If applicable, the exact command/SQL/diff to execute." }
+      },
+      "additionalProperties": true
+    },
+    "riskTier": { "type": "string", "enum": ["T0", "T1", "T2", "T3", "T4"] },
+    "rationale": {
+      "type": "string",
+      "description": "Why the agent wants to do this — must reference the ratified plan + the task's successCriteria."
+    },
+    "reversibilityPlan": {
+      "type": "string",
+      "description": "How this action can be undone. For T4 may be 'IRREVERSIBLE — depends on snapshot {snapshotId}'."
+    },
+    "recoverabilityState": {
+      "type": "object",
+      "required": ["backupVerified"],
+      "properties": {
+        "snapshotId": { "type": "string" },
+        "backupVerified": { "type": "boolean" },
+        "verifiedAt": { "type": "string", "format": "date-time" },
+        "verifier": { "type": "string" }
+      },
+      "description": "T4 proposals MUST have backupVerified=true; the gate refuses to even request approval otherwise."
+    },
+    "diffPreview": {
+      "type": "string",
+      "description": "Dry-run output / diff / count of affected rows. Required for T3+; strongly recommended for T2."
+    },
+    "blastRadius": {
+      "type": "object",
+      "properties": {
+        "scope": { "type": "string", "enum": ["sandbox", "branch", "staging", "production", "external"] },
+        "affectedCount": { "type": "integer", "minimum": 0 },
+        "affectedDescription": { "type": "string" }
+      }
+    },
+    "proposedAt": { "type": "string", "format": "date-time" },
+    "decidedAt": { "type": "string", "format": "date-time" },
+    "decision": { "type": "string", "enum": ["approve", "reject", "request_changes", "pending"] },
+    "decidedBy": { "type": "string" },
+    "decisionComment": { "type": "string" }
+  },
+  "additionalProperties": false
+}

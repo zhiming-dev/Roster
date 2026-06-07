@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://conclave.dev/schemas/agent-message.schema.json",
+  "title": "AgentMessage",
+  "description": "Typed message exchanged between agents or between an agent and the principal. Every inter-agent communication is logged. See conclave-spec.md §6.5.",
+  "type": "object",
+  "required": ["id", "runId", "threadId", "from", "to", "type", "payload", "timestamp"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^msg_[A-Za-z0-9_-]+$" },
+    "runId": { "type": "string" },
+    "threadId": {
+      "type": "string",
+      "description": "Ties a deliberation / task / approval-loop together across many messages."
+    },
+    "from": {
+      "type": "string",
+      "description": "Originating role or identity. 'principal' for the human; 'planner' or any sub-agent role otherwise."
+    },
+    "to": {
+      "type": "string",
+      "description": "Target role or 'broadcast' / 'principal'."
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "task_assignment",
+        "task_result",
+        "proposal",
+        "critique",
+        "vote",
+        "question",
+        "answer",
+        "status",
+        "error",
+        "approval_request",
+        "approval_decision"
+      ]
+    },
+    "payload": {
+      "description": "Type-narrowed by `type`. For task_assignment carries a Task; for task_result carries a TaskResult; for proposal carries an ActionProposal id; etc.",
+      "type": ["object", "array", "string", "number", "boolean", "null"]
+    },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "causedBy": {
+      "type": "string",
+      "description": "Parent message id — establishes the provenance chain."
+    },
+    "modelBinding": {
+      "type": "string",
+      "description": "If `from` is an LLM-backed agent, the model identifier that generated this message (e.g. 'claude-opus-4.7', 'gpt-5', 'gemini-2.5')."
+    }
+  },
+  "additionalProperties": false
+}

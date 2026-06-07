@@ -1,0 +1,18 @@
+{
+  "localhost": {
+    "name": "Localhost",
+    "baseUrl": "http://localhost:3000/datacontract/datasetsV2/kustoDatasets"
+  },
+  "test": {
+    "name": "Test",
+    "baseUrl": "https://cxptest.azure.com/datacontract"
+  },
+  "sandbox": {
+    "name": "Sandbox",
+    "baseUrl": "https://ui-dc-app-wus3-sandbox.azurewebsites.net/dataContract"
+  },
+  "sandboxtwo": {
+    "name": "Sandbox Two",
+    "baseUrl": "https://ui-dc-app-wus3-sandboxtwo.azurewebsites.net/dataContract"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://conclave.dev/schemas/capability-grant.schema.json",
+  "title": "CapabilityGrant",
+  "description": "Least-privilege capability grant attached to a sub-agent for a specific task. The runtime denies-by-default and only honors actions whose required capability is in this grant. See conclave-spec.md §4.",
+  "type": "object",
+  "required": ["agentRole", "taskId", "capabilities", "grantedAt"],
+  "properties": {
+    "agentRole": {
+      "type": "string",
+      "enum": ["planner", "qa", "coder", "reviewer", "researcher", "ops", "data"]
+    },
+    "taskId": { "type": "string" },
+    "capabilities": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/capabilityToken" },
+      "minItems": 0
+    },
+    "expiresAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional grant expiry. After this time the runtime refuses the capability without a re-grant."
+    },
+    "grantedAt": { "type": "string", "format": "date-time" },
+    "grantedBy": { "type": "string", "description": "Typically 'planner' for ratified plans; 'principal' for ad-hoc elevation." }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "capabilityToken": {
+      "type": "string",
+      "description": "A capability token of the form 'verb:resource[:scope]'. Examples: read:repo, write:repo:branch, run:tests, run:build, run:lint, read:web, comment:pr, deploy:staging, deploy:prod, db:read, db:write, fs:write:sandbox, secrets:read.",
+      "pattern": "^[a-z]+(:[a-z0-9-]+){1,2}$"
+    }
+  }
+}

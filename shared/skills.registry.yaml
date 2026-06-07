@@ -1,0 +1,74 @@
+# Conclave Skill Registry
+# Discoverable index of all skills in this repo. Agents consult this to know
+# what is available and where to load it from. See conclave-spec.md §6.3.
+
+version: 0
+updated: 2026-05-28
+
+skills:
+
+  # Cross-cutting skills (any agent may use)
+  - name: approval-gate
+    path: shared/approval-gate/SKILL.md
+    applies_to_roles: [planner, qa, e2e, coder, reviewer, researcher, ops, data]
+    summary: Risk-tier classification (T0–T4) and approval UX for any proposed action.
+    requires_capability: []   # the gate itself runs in the agent's process; no extra perms
+    default_risk_tier: T0
+    version: 0.1.0
+
+  - name: provenance
+    path: shared/provenance/SKILL.md
+    applies_to_roles: [planner, qa, e2e, coder, reviewer, researcher, ops, data]
+    summary: Append structured events to the run's append-only provenance log.
+    requires_capability: [fs:write:run]
+    default_risk_tier: T1
+    version: 0.1.0
+
+  - name: council
+    path: shared/council/SKILL.md
+    applies_to_roles: [planner]
+    summary: Cross-model deliberation with anti-conformity safeguards. Selective use only.
+    requires_capability: [model:invoke]
+    default_risk_tier: T0
+    version: 0.1.0
+
+  # Role-bound skills
+  - name: planner-runner
+    path: planner-agent/planner-runner/SKILL.md
+    applies_to_roles: [planner]
+    summary: Decompose a goal into a ratifiable plan and dispatch ratified tasks to experts.
+    requires_capability: [read:repo, fs:write:run, model:invoke]
+    default_risk_tier: T1
+    version: 0.1.0
+
+  - name: e2e-runner   # the E2E Test agent's runner skill
+    path: e2e-agent/e2e-runner/SKILL.md
+    applies_to_roles: [e2e]
+    summary: Run user-defined E2E suites via playwright-cli against a running build; report pass/fail. Dispatched after the Coder lands a change.
+    requires_capability: [read:repo, run:tests, fs:write:sandbox]
+    default_risk_tier: T0   # tests are read-only against the app
+    version: 0.4.0
+
+  - name: qa-runner   # the QA / Validation agent's runner skill
+    path: qa-agent/qa-runner/SKILL.md
+    applies_to_roles: [qa]
+    summary: Validate and fact-check another agent's output against evidence and success criteria; web search to verify.
+    requires_capability: [read:repo, web:search]
+    default_risk_tier: T0   # read-only validation
+    version: 0.1.0
+
+  - name: coder-runner
+    path: coder-agent/coder-runner/SKILL.md
+    applies_to_roles: [coder]
+    summary: Implement code changes on a feature branch per the assigned task; never on main.
+    requires_capability: [read:repo, write:repo:branch, run:build]
+    default_risk_tier: T2   # commits on feature branch are reversible-with-effort
+    version: 0.1.0
+
+  - name: reviewer-runner
+    path: reviewer-agent/reviewer-runner/SKILL.md
+    applies_to_roles: [reviewer]
+    summary: Review a diff against the task's success criteria; run linters; comment on PR.
+    requires_capability: [read:repo, run:lint, comment:pr]
+    default_risk_tier: T1
+    version: 0.1.0

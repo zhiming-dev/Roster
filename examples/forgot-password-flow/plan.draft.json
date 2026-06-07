@@ -1,0 +1,71 @@
+{
+  "id": "plan_run_2026-05-28_fp_v1",
+  "version": 1,
+  "runId": "run_2026-05-28_fp",
+  "goal": {
+    "text": "Add a 'forgot password' flow to the web app and make sure it works end-to-end.\n\nWhile you're at it, clean up stale password-reset tokens that are older than 30 days — they should never have been retained that long.",
+    "constraints": [
+      "No production deploys without explicit approval.",
+      "No schema changes.",
+      "The forgot-password change must have automated test coverage before it merges."
+    ]
+  },
+  "tasks": [
+    {
+      "id": "task_impl-reset-flow",
+      "description": "Implement the forgot-password endpoint + UI on a feature branch feat/forgot-password. Include unit tests for the new code paths. Do NOT push to main.",
+      "assigneeRole": "coder",
+      "requiredCapabilities": ["read:repo", "write:repo:branch", "run:build"],
+      "riskTier": "T2",
+      "successCriteria": "Branch builds; new unit tests pass; PR drafted (not published).",
+      "expectedArtifacts": ["task_impl-reset-flow/diff.patch", "task_impl-reset-flow/build.log"],
+      "recoverabilityPlan": "Discard the feature branch; nothing merged."
+    },
+    {
+      "id": "task_review-reset-flow",
+      "description": "Review the diff produced by task_impl-reset-flow against its success criteria. Run linters. Surface any blocking issues.",
+      "assigneeRole": "reviewer",
+      "requiredCapabilities": ["read:repo", "run:lint", "comment:pr"],
+      "riskTier": "T1",
+      "successCriteria": "No Blocking review items; lint clean.",
+      "dependsOn": ["task_impl-reset-flow"],
+      "expectedArtifacts": ["task_review-reset-flow/review.md", "task_review-reset-flow/lint.log"]
+    },
+    {
+      "id": "task_e2e-reset-flow",
+      "description": "Run the auth E2E suite plus a new 'forgot-password' E2E test against the feature branch at localhost.",
+      "assigneeRole": "qa",
+      "requiredCapabilities": ["read:repo", "run:tests"],
+      "riskTier": "T0",
+      "successCriteria": "All auth-suite tests pass AND the new forgot-password E2E test passes.",
+      "dependsOn": ["task_review-reset-flow"],
+      "expectedArtifacts": ["task_e2e-reset-flow/results.json", "task_e2e-reset-flow/report.html"]
+    },
+    {
+      "id": "task_purge-stale-tokens",
+      "description": "Clean up password_resets rows older than 30 days in production.",
+      "assigneeRole": "ops",
+      "requiredCapabilities": ["db:write"],
+      "riskTier": "T3",
+      "successCriteria": "Stale rows removed.",
+      "dependsOn": ["task_e2e-reset-flow"]
+    }
+  ],
+  "edges": [
+    {"from": "task_impl-reset-flow",   "to": "task_review-reset-flow"},
+    {"from": "task_review-reset-flow", "to": "task_e2e-reset-flow"},
+    {"from": "task_e2e-reset-flow",    "to": "task_purge-stale-tokens"}
+  ],
+  "approvalState": "rejected",
+  "approvalHistory": [
+    {
+      "at": "2026-05-28T15:11:42Z",
+      "actor": "principal",
+      "decision": "request_changes",
+      "comment": "task_purge-stale-tokens is way under-spec'd. (1) It's classified T3 but a DELETE on a prod table is T4. (2) There is no recoverability precondition — I want an explicit snapshot task before the delete. (3) successCriteria has to enforce the 30-day predicate, not just 'rows removed'. Please revise."
+    }
+  ],
+  "createdAt": "2026-05-28T15:10:18Z",
+  "createdBy": "planner",
+  "notes": "First draft. Will be revised to add a snapshot precondition and re-tier the delete."
+}

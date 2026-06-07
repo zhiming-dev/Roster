@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://conclave.dev/schemas/task.schema.json",
+  "title": "Task",
+  "description": "A single node in a Plan. Describes one unit of work assigned to one expert sub-agent role. See conclave-spec.md §6.1.",
+  "type": "object",
+  "required": ["id", "description", "assigneeRole", "requiredCapabilities", "riskTier", "successCriteria"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^task_[A-Za-z0-9_-]+$" },
+    "description": {
+      "type": "string",
+      "description": "Plain-English instruction the sub-agent receives. Be specific about scope; the sub-agent will not re-plan."
+    },
+    "assigneeRole": {
+      "type": "string",
+      "enum": ["planner", "qa", "coder", "reviewer", "researcher", "ops", "data"]
+    },
+    "requiredCapabilities": {
+      "type": "array",
+      "items": { "$ref": "capability-grant.schema.json#/$defs/capabilityToken" },
+      "description": "Least-privilege capability tokens this task needs (e.g. read:repo, run:tests). The runtime refuses to dispatch if the assigned agent lacks any of these."
+    },
+    "riskTier": {
+      "type": "string",
+      "enum": ["T0", "T1", "T2", "T3", "T4"],
+      "description": "Maximum risk tier any action under this task may reach. T3/T4 require human ratification before enactment. See approval-gate skill."
+    },
+    "successCriteria": {
+      "type": "string",
+      "description": "Machine- or human-checkable definition of done. Used by the Reviewer/Planner to accept the TaskResult."
+    },
+    "dependsOn": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Other task ids that must complete first. Redundant with Plan.edges; kept for sub-agent local reading."
+    },
+    "inputs": {
+      "type": "object",
+      "description": "Free-form structured inputs the sub-agent reads.",
+      "additionalProperties": true
+    },
+    "expectedArtifacts": {
+      "type": "array",
+      "description": "Paths (relative to runs/<runId>/artifacts/) the sub-agent is expected to produce.",
+      "items": { "type": "string" }
+    },
+    "modelHint": {
+      "type": "string",
+      "description": "Optional preference (e.g. 'claude-opus', 'gpt-5', 'local-qwen'). The runtime treats this as a hint only."
+    },
+    "recoverabilityPlan": {
+      "type": "string",
+      "description": "For T3/T4: how this task's effects can be undone if needed."
+    }
+  },
+  "additionalProperties": false
+}

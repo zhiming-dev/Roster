@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://conclave.dev/schemas/task-result.schema.json",
+  "title": "TaskResult",
+  "description": "Structured result a sub-agent returns to the planner after executing a task.",
+  "type": "object",
+  "required": ["taskId", "runId", "status", "completedBy", "completedAt"],
+  "properties": {
+    "taskId": { "type": "string" },
+    "runId": { "type": "string" },
+    "status": {
+      "type": "string",
+      "enum": ["success", "partial", "failure", "blocked_on_approval", "blocked_on_dependency", "aborted"]
+    },
+    "completedBy": { "type": "string" },
+    "completedAt": { "type": "string", "format": "date-time" },
+    "summary": { "type": "string", "description": "One-paragraph human-readable result." },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "kind"],
+        "properties": {
+          "path": { "type": "string", "description": "Relative to runs/<runId>/artifacts/" },
+          "kind": { "type": "string", "description": "e.g. 'diff', 'test-report', 'log', 'screenshot', 'doc'" },
+          "summary": { "type": "string" }
+        }
+      }
+    },
+    "evidence": {
+      "type": "string",
+      "description": "Concrete evidence the success criteria were/were not met. References artifacts by path."
+    },
+    "openProposals": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^prop_[A-Za-z0-9_-]+$" },
+      "description": "ActionProposal ids that are still pending approval, blocking this task."
+    },
+    "failureReason": { "type": "string" },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Free-form: e.g. tests passed/failed, lint warnings, latency, tokens used."
+    }
+  },
+  "additionalProperties": false
+}

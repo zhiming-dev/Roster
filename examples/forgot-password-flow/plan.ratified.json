@@ -1,0 +1,92 @@
+{
+  "id": "plan_run_2026-05-28_fp_v2",
+  "version": 2,
+  "runId": "run_2026-05-28_fp",
+  "supersedes": "plan_run_2026-05-28_fp_v1",
+  "goal": {
+    "text": "Add a 'forgot password' flow to the web app and make sure it works end-to-end.\n\nWhile you're at it, clean up stale password-reset tokens that are older than 30 days — they should never have been retained that long.",
+    "constraints": [
+      "No production deploys without explicit approval.",
+      "No schema changes.",
+      "The forgot-password change must have automated test coverage before it merges."
+    ]
+  },
+  "tasks": [
+    {
+      "id": "task_impl-reset-flow",
+      "description": "Implement the forgot-password endpoint + UI on a feature branch feat/forgot-password. Include unit tests for the new code paths. Do NOT push to main.",
+      "assigneeRole": "coder",
+      "requiredCapabilities": ["read:repo", "write:repo:branch", "run:build"],
+      "riskTier": "T2",
+      "successCriteria": "Branch builds; new unit tests pass; PR drafted (not published).",
+      "expectedArtifacts": ["task_impl-reset-flow/diff.patch", "task_impl-reset-flow/build.log"],
+      "recoverabilityPlan": "Discard the feature branch; nothing merged."
+    },
+    {
+      "id": "task_review-reset-flow",
+      "description": "Review the diff produced by task_impl-reset-flow against its success criteria. Run linters. Surface any blocking issues.",
+      "assigneeRole": "reviewer",
+      "requiredCapabilities": ["read:repo", "run:lint", "comment:pr"],
+      "riskTier": "T1",
+      "successCriteria": "No Blocking review items; lint clean.",
+      "dependsOn": ["task_impl-reset-flow"],
+      "expectedArtifacts": ["task_review-reset-flow/review.md", "task_review-reset-flow/lint.log"]
+    },
+    {
+      "id": "task_e2e-reset-flow",
+      "description": "Run the auth E2E suite plus a new 'forgot-password' E2E test against the feature branch at localhost.",
+      "assigneeRole": "qa",
+      "requiredCapabilities": ["read:repo", "run:tests"],
+      "riskTier": "T0",
+      "successCriteria": "All auth-suite tests pass AND the new forgot-password E2E test passes.",
+      "dependsOn": ["task_review-reset-flow"],
+      "expectedArtifacts": ["task_e2e-reset-flow/results.json", "task_e2e-reset-flow/report.html"]
+    },
+    {
+      "id": "task_snapshot-prod-tokens",
+      "description": "Take a verified snapshot of password_resets in production BEFORE any cleanup. Verify the snapshot is restorable by restoring it onto staging and confirming row counts match.",
+      "assigneeRole": "data",
+      "requiredCapabilities": ["db:read", "db:snapshot"],
+      "riskTier": "T2",
+      "successCriteria": "Snapshot id recorded in artifacts/snapshot-id.txt AND restore verified on staging with matching row count.",
+      "dependsOn": ["task_e2e-reset-flow"],
+      "expectedArtifacts": ["task_snapshot-prod-tokens/snapshot-id.txt", "task_snapshot-prod-tokens/verify-restore.log"],
+      "recoverabilityPlan": "Snapshots themselves are inert; no rollback needed."
+    },
+    {
+      "id": "task_purge-stale-tokens",
+      "description": "Delete rows from production.password_resets where created_at < NOW() - INTERVAL '30 days'. MUST include the WHERE predicate. Requires the snapshot from task_snapshot-prod-tokens to be verified before this task may emit its action proposal.",
+      "assigneeRole": "ops",
+      "requiredCapabilities": ["db:write"],
+      "riskTier": "T4",
+      "successCriteria": "After the delete, COUNT(*) WHERE created_at < NOW() - INTERVAL '30 days' === 0 AND no rows newer than 30 days are affected (verified by comparing pre/post counts in the >=30d-old segment to the dry-run count).",
+      "dependsOn": ["task_snapshot-prod-tokens"],
+      "recoverabilityPlan": "Restore from snapshot id recorded by task_snapshot-prod-tokens (verified restorable on staging)."
+    }
+  ],
+  "edges": [
+    {"from": "task_impl-reset-flow",     "to": "task_review-reset-flow"},
+    {"from": "task_review-reset-flow",   "to": "task_e2e-reset-flow"},
+    {"from": "task_e2e-reset-flow",      "to": "task_snapshot-prod-tokens"},
+    {"from": "task_snapshot-prod-tokens","to": "task_purge-stale-tokens", "kind": "data"}
+  ],
+  "approvalState": "ratified",
+  "approvalHistory": [
+    {
+      "at": "2026-05-28T15:11:42Z",
+      "actor": "principal",
+      "decision": "request_changes",
+      "comment": "see v1 — needed snapshot + T4 + tighter WHERE.",
+      "diffFromVersion": 1
+    },
+    {
+      "at": "2026-05-28T15:18:03Z",
+      "actor": "principal",
+      "decision": "approve",
+      "comment": "Approved. Snapshot task added; purge re-tiered to T4 with explicit WHERE predicate in the success criteria; recoverability plan references the snapshot id.",
+      "diffFromVersion": 1
+    }
+  ],
+  "createdAt": "2026-05-28T15:17:21Z",
+  "createdBy": "planner"
+}

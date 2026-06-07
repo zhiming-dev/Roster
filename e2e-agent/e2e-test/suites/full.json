@@ -1,0 +1,5 @@
+{
+  "name": "Full Regression",
+  "description": "Runs every test definition. Use for full regression before releases.",
+  "folders": ["smoke", "navigation", "datasets", "contracts", "feedback"]
+}

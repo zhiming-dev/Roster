@@ -1,0 +1,123 @@
+# =============================================================================
+# Conclave runtime — EXAMPLE config (safe to commit).
+#
+# Copy this file to `agents.config.yaml` and edit it with your real endpoints /
+# keys. The live `agents.config.yaml` is gitignored so secrets never land in
+# source control; THIS example file is the committed template.
+#
+#   PowerShell:  Copy-Item agents.config.example.yaml agents.config.yaml
+#   bash:        cp agents.config.example.yaml agents.config.yaml
+#
+# Per agent you can set, right here:
+#   provider     ollama | azure_foundry
+#   endpoint     base URL of the backend
+#   model        Ollama model name              (ollama)
+#   deployment   Azure deployment name          (azure_foundry; falls back to `model`)
+#   api_key      secret — use ${ENV_VAR}, NEVER a literal key
+#   api_version  Azure REST api-version         (azure_foundry; omit for the v1 surface)
+#   auth         auto | key | bearer            (azure_foundry; auto picks per endpoint)
+#   tools        e.g. [search]                  (grant the web-search tool)
+#
+# Secrets: any value may reference an env var as ${VAR} or ${VAR:-default};
+# expanded when the config loads. Per-agent env overrides also work without
+# editing this file:
+#   CONCLAVE_<AGENT>_PROVIDER / _ENDPOINT / _MODEL / _DEPLOYMENT / _API_KEY
+#   e.g.  $env:CONCLAVE_PLANNER_MODEL = "llama3.1:8b"
+#
+# This template defaults to a local Ollama so a fresh clone runs with no keys:
+#   ollama pull tinyllama:latest
+# To use Azure AI Foundry instead, see the commented block under `planner`.
+# =============================================================================
+
+# ---- Defaults inherited by every agent (each agent may override any field) ---
+defaults:
+  provider: ollama
+  endpoint: http://localhost:11434
+  model: tinyllama:latest
+  options:
+    temperature: 0.2
+    # `num_predict` (Ollama) / `max_tokens` (Azure) cap the reply length.
+    num_predict: 384
+  keep_alive: "10m"
+  request_timeout_s: 120
+  # Truncate the .agent.md system prompt to this many characters before use.
+  # Critical on tiny local models (tinyllama's 2048-token context): the full
+  # planner prompt is ~6k chars and otherwise fills the whole window.
+  system_prompt_max_chars: 1500
+
+# ---- Shared LLM queue --------------------------------------------------------
+# When several agents share ONE backend / API key (typical while testing with a
+# single deployment), concurrent calls cause rate-limit errors or local memory
+# thrash. Agents listed in `require_queue` are serialized through the queue and
+# admit at most `max_concurrency` at a time; their wait shows up on the
+# dashboard as the `queued` status. Agents NOT listed call the model directly.
+queue:
+  max_concurrency: 1
+  require_queue:
+    - planner
+    - coder
+    - e2e
+    - reviewer
+    - qa
+    - researcher
+
+# ---- Web search tool ---------------------------------------------------------
+# The runtime's first real tool. Agents granted `tools: [search]` (researcher and
+# qa below) can issue web searches; the wait shows up on the dashboard as `searching`.
+#   provider: auto         → DuckDuckGo (no key). Auto-upgrades to Tavily if a key exists.
+#   provider: tavily       → cleaner results; needs api_key or TAVILY_API_KEY env var.
+#   provider: duckduckgo   → force DuckDuckGo (no key, but flakier).
+#   provider: none         → disable search entirely.
+search:
+  enabled: true
+  provider: auto
+  # api_key: ${TAVILY_API_KEY}
+  max_results: 5
+
+# ---- Agents ------------------------------------------------------------------
+agents:
+  # The principal only ever talks to the planner; it dispatches to the rest.
+  planner:
+    agent_file: ../planner-agent/planner.agent.md
+    role: planner
+    # --- Default: local Ollama (inherits `defaults` above) --------------------
+    # --- Option: Azure AI Foundry --------------------------------------------
+    #   1. export the key:  $env:AZURE_FOUNDRY_API_KEY = "<your-key>"
+    #   2. uncomment and edit:
+    # provider: azure_foundry
+    # endpoint: https://YOUR-RESOURCE.services.ai.azure.com/openai/v1/chat/completions
+    # deployment: gpt-4o-mini            # your deployment name (exact, from the portal)
+    # api_key: ${AZURE_FOUNDRY_API_KEY}  # read from env — never a literal key
+    # # api_version: "2024-05-01-preview"  # omit for the /openai/v1 surface (versionless)
+    # options: { temperature: 0.2, max_tokens: 800 }
+
+  coder:
+    agent_file: ../coder-agent/coder.agent.md
+    role: coder
+    # A code-specialized model usually helps here, e.g.:
+    # model: qwen2.5-coder:7b
+
+  # The E2E Test agent runs browser/Playwright suites. Dispatch it AFTER the
+  # coder lands a change, to verify it against a running build.
+  e2e:
+    agent_file: ../e2e-agent/e2e.agent.md
+    role: e2e
+
+  reviewer:
+    agent_file: ../reviewer-agent/reviewer.agent.md
+    role: reviewer
+
+  # QA validates / fact-checks other agents' outputs. It has the web-search tool
+  # so it can independently verify factual claims (it is NOT the browser-test agent).
+  qa:
+    agent_file: ../qa-agent/qa.agent.md
+    role: qa
+    tools: [search]
+
+  # The Researcher has the web-search tool — dispatch live/external-fact questions
+  # (market data, news, weather) here instead of letting the planner guess.
+  researcher:
+    agent_file: ../researcher-agent/researcher.agent.md
+    role: researcher
+    tools: [search]
+    options: { temperature: 0.2, num_predict: 1000 }

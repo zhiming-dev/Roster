@@ -1,0 +1,32 @@
+{
+  "id": "prop_run_2026-05-28_fp_purge",
+  "runId": "run_2026-05-28_fp",
+  "taskId": "task_purge-stale-tokens",
+  "proposedBy": "ops",
+  "action": {
+    "kind": "db.execute",
+    "summary": "Delete password_resets rows older than 30 days in production.",
+    "target": "production.password_resets (postgres-prod-wus3)",
+    "command": "DELETE FROM password_resets WHERE created_at < NOW() - INTERVAL '30 days';"
+  },
+  "riskTier": "T4",
+  "rationale": "task_purge-stale-tokens of plan_run_2026-05-28_fp_v2 requires removing stale reset tokens older than 30 days. The WHERE predicate matches the task's successCriteria exactly. A verified snapshot exists from task_snapshot-prod-tokens (id snap_pwreset_2026-05-28_14-02Z), restorability confirmed on staging at 2026-05-28T14:11:08Z.",
+  "reversibilityPlan": "Restore password_resets from snap_pwreset_2026-05-28_14-02Z (verified restorable on staging — see runs/run_2026-05-28_fp/artifacts/task_snapshot-prod-tokens/verify-restore.log).",
+  "recoverabilityState": {
+    "snapshotId": "snap_pwreset_2026-05-28_14-02Z",
+    "backupVerified": true,
+    "verifiedAt": "2026-05-28T14:11:08Z",
+    "verifier": "data-agent (task_snapshot-prod-tokens)"
+  },
+  "diffPreview": "Dry-run on snap_pwreset_2026-05-28_14-02Z restored to staging:\n  rows matching WHERE: 4,213\n  oldest row affected: 2025-11-04T22:18:09Z\n  newest row affected: 2026-04-28T07:55:31Z   (30d boundary = 2026-04-28T15:18:03Z)\n  rows NOT affected (created_at >= 30d boundary): 1,067\nPost-delete row-count expected: 1,067.",
+  "blastRadius": {
+    "scope": "production",
+    "affectedCount": 4213,
+    "affectedDescription": "password_resets rows where created_at < NOW() - INTERVAL '30 days'"
+  },
+  "proposedAt": "2026-05-28T15:42:11Z",
+  "decidedAt": "2026-05-28T15:44:28Z",
+  "decision": "approve",
+  "decidedBy": "principal",
+  "decisionComment": "Dry-run looks right. Boundary computation checks out. Snapshot verified <2h ago. Approved."
+}
