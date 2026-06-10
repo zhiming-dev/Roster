@@ -34,6 +34,12 @@ qa-agent/e2e-test/failure-screenshots/
 runs/
 !runs/.gitkeep
 
+# SQLite persistence (chat history DB + run artifacts on the Docker volume)
+runtime/data/
+*.db
+*.sqlite
+*.sqlite3
+
 # Research outputs (reproducible from the harness)
 research/results/
 research/.cache/

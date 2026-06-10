@@ -6,9 +6,14 @@ local Ollama daemon or Azure AI Foundry, and exposes:
 
 - A **chat-with-Planner** endpoint (`POST /api/chat`) — the principal only ever talks
   to the Planner. The Planner dispatches to specialists.
-- A **live dashboard** at <http://localhost:8765/> — agent cards (model, status), a
-  chat pane, and a real-time event feed showing every inter-agent message.
-- A **WebSocket event stream** (`GET /ws`) — same data the dashboard consumes.
+- A **live dashboard** at <http://localhost:8765/> — a chat-history sidebar, a top
+  **agent-lineage graph** that lights up the active edge when two agents are talking,
+  a centered chat (your messages right, agents left), and a collapsible **inter-agent
+  activity** side panel.
+- A **WebSocket event stream** (`GET /ws`) — the live data the dashboard consumes.
+- **Persistent chat history** in **SQLite** (`ROSTER_DB_PATH`, default
+  `data/roster.db`) — every conversation and inter-agent event is saved, so you can
+  reopen past chats from the sidebar and continue them.
 - An **append-only provenance log** at `../runs/<runId>/provenance.jsonl`.
 
 > This is an MVP. **Web search is wired up** (the Researcher and QA agents can really
@@ -51,9 +56,40 @@ python -m roster
 
 Then open <http://localhost:8765/>.
 
-The very first check the dashboard does is hit `GET /api/health` — it'll tell you per
-agent whether the Ollama endpoint is reachable and whether the configured model is
-pulled.
+On startup the runtime health-checks every agent (`GET /api/health`) and logs, per
+agent, whether its provider endpoint is reachable and the configured model is present.
+
+### The dashboard, at a glance
+
+- **Left — history.** Every conversation is listed (newest first). Click one to reopen
+  it (the Planner's history is restored so you can continue); **New chat** starts a
+  fresh run; hover an item to delete it.
+- **Top — agent lineage.** A horizontal graph of the agents. When the Planner dispatches
+  a specialist (or one reports back), that edge animates and both nodes pulse; a node
+  glows while it's `thinking` / `searching` / `queued`.
+- **Center — chat.** You talk to the Planner. Your messages sit on the right, every
+  agent reply on the left.
+- **Right — inter-agent activity.** A collapsible panel (closed by default; open it with
+  the **Activity** button) streaming dispatches, task results, web searches and errors.
+
+### Run in Docker (with persistent SQLite history)
+
+SQLite is file-based, so "running it in Docker" means the runtime container keeps its
+`roster.db` on a mounted volume. From this directory:
+
+```powershell
+docker compose up --build
+```
+
+Then open <http://localhost:8765/>. Conversation history is written to the `roster-data`
+volume and survives `docker compose down`; wipe it with `docker compose down -v`.
+
+> The build context is the **repo root** (agents reference `../<role>-agent/*.agent.md`),
+> which the provided [`docker-compose.yml`](./docker-compose.yml) sets for you. Put model
+> secrets in the environment (e.g. `ROSTER_PLANNER_API_KEY`) or a `runtime/.env` file
+> rather than committing them — the YAML already supports `${ENV_VAR}` expansion. If an
+> agent points at a **local Ollama**, use `http://host.docker.internal:11434` as its
+> endpoint so the container can reach the host daemon.
 
 ## 4. Try it
 
@@ -61,7 +97,7 @@ In the chat box, talk to the Planner the way the principal would:
 
 > add a `/health` endpoint to the API, then E2E-test it
 
-You should see in the event feed (right pane):
+Open the **Activity** panel (top-right) and you'll see:
 
 ```
 principal → planner          user.message
@@ -76,9 +112,9 @@ Or try a research question to see the **web-search tool** in action:
 
 > how did the 3 US indexes do on 2026-06-05 and what drove them?
 
-The Planner dispatches to `researcher`, whose card turns green (`searching`) while live
-queries run; the queries and result URLs stream into the event feed as `🌐 search` rows.
-The Planner can then have `qa` fact-check the synthesis before delivering it.
+The Planner dispatches to `researcher`, whose lineage node glows green (`searching`) while
+live queries run; the queries and result URLs stream into the Activity panel as `search`
+rows. The Planner can then have `qa` fact-check the synthesis before delivering it.
 
 The Planner is told (via runtime system-prompt suffix) that it ends a reply with
 `DISPATCH:<role>:<task>` when it needs a specialist. The orchestrator parses that
@@ -105,9 +141,12 @@ runtime/
 │   ├── orchestrator.py         ← planner-led dispatch loop, parses DISPATCH:
 │   ├── bus.py                  ← in-process pub/sub (WebSocket fan-out)
 │   ├── provenance.py           ← append-only JSONL writer
-│   └── server.py               ← FastAPI app: /, /api/chat, /api/agents, /api/queue, /ws
-└── static/
-    └── dashboard.html          ← single-page dashboard
+│   ├── store.py                ← SQLite persistence (conversations + event streams)
+│   └── server.py               ← FastAPI app: /, /api/chat, /api/agents, /api/conversations, /ws
+├── static/
+│   └── dashboard.html          ← single-page dashboard (Apple-style UI)
+├── Dockerfile                  ← runtime image (build context = repo root)
+└── docker-compose.yml          ← run the app + persistent SQLite volume
 ```
 
 > The `researcher` agent (in [`../researcher-agent/`](../researcher-agent/)) is the first
@@ -292,7 +331,8 @@ that slow. Reduce `system_prompt_max_chars`, switch to a smaller model, or raise
 | Council deliberation | ❌ | Wire a `convene_council()` path that fans the same prompt to multiple providers. |
 | Cloud providers | ✅ Azure AI Foundry / Azure OpenAI | Add OpenAI / Anthropic / Gemini behind the same `Provider` protocol in `providers/`. |
 | Shared-resource queue | ✅ `queue.require_queue` | Per-backend queues, priority lanes, token-bucket rate limiting. |
-| Multi-turn sub-agent memory | partial | Sub-agents keep history within a run but don't persist across runs. |
+| Persistent chat history | ✅ SQLite (`data/roster.db`) | Conversations + inter-agent events persist; reopen & continue past chats from the sidebar. |
+| Multi-turn sub-agent memory | partial | The Planner's history is restored when reopening a chat; sub-agent histories are not (yet). |
 
 ## 10. Why this shape
 

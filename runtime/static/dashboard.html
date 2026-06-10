@@ -4,373 +4,646 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Roster — runtime dashboard</title>
+  <title>Roster</title>
   <style>
     :root {
-      --bg: #0b1020;
-      --panel: #131a30;
-      --panel-2: #1a2240;
-      --line: #25305a;
-      --text: #e7ecff;
-      --muted: #8b97c2;
-      --accent: #7aa2ff;
-      --ok: #6ddc8c;
-      --warn: #ffcc66;
-      --err: #ff6b6b;
-      --planner: #a78bfa;
-      --coder: #6ddc8c;
-      --reviewer: #ffcc66;
-      --qa: #7aa2ff;
-      --principal: #f0a3c7;
+      --bg: #e9e9ee;
+      --bg-grad-1: #eef0f5;
+      --bg-grad-2: #e3e4ea;
+      --surface: rgba(255,255,255,0.72);
+      --surface-2: rgba(255,255,255,0.55);
+      --surface-solid: #ffffff;
+      --elev: rgba(255,255,255,0.86);
+      --hover: rgba(0,0,0,0.045);
+      --active-bg: rgba(0,122,255,0.12);
+      --text: #1d1d1f;
+      --text-2: #6e6e73;
+      --text-3: #9b9ba1;
+      --sep: rgba(0,0,0,0.08);
+      --sep-strong: rgba(0,0,0,0.14);
+      --accent: #007aff;
+      --accent-press: #0062cc;
+      --on-accent: #ffffff;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.06), 0 1px 1px rgba(0,0,0,0.04);
+      --shadow: 0 10px 30px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+      --shadow-lg: 0 24px 60px rgba(0,0,0,0.18);
+      --blur: saturate(180%) blur(28px);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --planner: #bf5af2;
+      --coder: #34c759;
+      --e2e: #ff9500;
+      --reviewer: #ffb300;
+      --qa: #007aff;
+      --researcher: #00b0c7;
+      --principal: #ff2d55;
+      --ok: #34c759;
+      --warn: #ff9500;
+      --err: #ff3b30;
     }
+    :root[data-theme="dark"] {
+      --bg: #000000;
+      --bg-grad-1: #0c0c0f;
+      --bg-grad-2: #000000;
+      --surface: rgba(28,28,30,0.70);
+      --surface-2: rgba(36,36,40,0.55);
+      --surface-solid: #1c1c1e;
+      --elev: rgba(44,44,46,0.82);
+      --hover: rgba(255,255,255,0.06);
+      --active-bg: rgba(10,132,255,0.20);
+      --text: #f5f5f7;
+      --text-2: #aeaeb2;
+      --text-3: #8e8e93;
+      --sep: rgba(255,255,255,0.10);
+      --sep-strong: rgba(255,255,255,0.18);
+      --accent: #0a84ff;
+      --accent-press: #409cff;
+      --on-accent: #ffffff;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
+      --shadow: 0 12px 36px rgba(0,0,0,0.55);
+      --shadow-lg: 0 28px 70px rgba(0,0,0,0.7);
+      --planner: #d08bf5;
+      --coder: #30d158;
+      --e2e: #ff9f0a;
+      --reviewer: #ffd60a;
+      --qa: #0a84ff;
+      --researcher: #64d2ff;
+      --principal: #ff375f;
+      --ok: #30d158;
+      --warn: #ff9f0a;
+      --err: #ff453a;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #000000; --bg-grad-1: #0c0c0f; --bg-grad-2: #000000;
+        --surface: rgba(28,28,30,0.70); --surface-2: rgba(36,36,40,0.55);
+        --surface-solid: #1c1c1e; --elev: rgba(44,44,46,0.82);
+        --hover: rgba(255,255,255,0.06); --active-bg: rgba(10,132,255,0.20);
+        --text: #f5f5f7; --text-2: #aeaeb2; --text-3: #8e8e93;
+        --sep: rgba(255,255,255,0.10); --sep-strong: rgba(255,255,255,0.18);
+        --accent: #0a84ff; --accent-press: #409cff;
+        --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
+        --shadow: 0 12px 36px rgba(0,0,0,0.55);
+        --shadow-lg: 0 28px 70px rgba(0,0,0,0.7);
+        --planner: #d08bf5; --coder: #30d158; --e2e: #ff9f0a;
+        --reviewer: #ffd60a; --qa: #0a84ff; --researcher: #64d2ff;
+        --principal: #ff375f; --ok: #30d158; --warn: #ff9f0a; --err: #ff453a;
+      }
+    }
+
     * { box-sizing: border-box; }
     html, body { height: 100%; margin: 0; }
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
-      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+      background:
+        radial-gradient(1200px 800px at 15% -10%, var(--bg-grad-1), transparent 60%),
+        radial-gradient(1000px 700px at 100% 110%, var(--bg-grad-2), transparent 55%),
+        var(--bg);
       color: var(--text);
       font-size: 14px;
-      line-height: 1.45;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      letter-spacing: -0.01em;
+      overflow: hidden;
     }
-    header {
-      padding: 12px 20px;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: var(--panel);
-    }
-    header h1 {
-      font-size: 15px;
-      margin: 0;
-      letter-spacing: 0.04em;
-      font-weight: 600;
-    }
-    header h1 span { color: var(--muted); font-weight: 400; }
-    header .meta { color: var(--muted); font-size: 12px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-    header button {
-      background: transparent;
-      border: 1px solid var(--line);
-      color: var(--muted);
-      padding: 4px 10px;
-      border-radius: 4px;
-      font-size: 12px;
-      cursor: pointer;
-      margin-left: 10px;
-    }
-    header button:hover { color: var(--text); border-color: var(--accent); }
+    button { font-family: inherit; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-thumb { background: var(--sep-strong); border-radius: 10px; border: 3px solid transparent; background-clip: content-box; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-3); background-clip: content-box; }
 
-    #agents {
+    .app {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 10px;
-      padding: 12px 20px;
-      border-bottom: 1px solid var(--line);
-      background: var(--panel);
+      grid-template-columns: var(--sidebar-w, 272px) minmax(0, 1fr) var(--activity-w, 0px);
+      height: 100vh;
+      transition: grid-template-columns 0.34s cubic-bezier(0.32, 0.72, 0, 1);
     }
-    .agent-card {
-      background: var(--panel-2);
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 10px 12px;
+    .app.activity-open { --activity-w: 372px; }
+    .app.sidebar-collapsed { --sidebar-w: 0px; }
+
+    /* ───────────────────────── Sidebar ───────────────────────── */
+    .sidebar {
+      grid-column: 1;
+      min-width: 0;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+      backdrop-filter: var(--blur);
+      -webkit-backdrop-filter: var(--blur);
+      border-right: 1px solid var(--sep);
+    }
+    .sidebar-inner { width: 272px; display: flex; flex-direction: column; height: 100%; }
+    .brand {
+      display: flex; align-items: center; gap: 10px;
+      padding: 18px 18px 10px;
+    }
+    .brand .logo {
+      width: 28px; height: 28px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--planner));
+      display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px;
+      box-shadow: var(--shadow-sm);
+    }
+    .brand h1 { font-size: 17px; font-weight: 650; margin: 0; letter-spacing: -0.02em; }
+    .brand .sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+    .new-chat {
+      margin: 8px 12px 6px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 11px 14px;
+      background: var(--accent); color: var(--on-accent);
+      border: none; border-radius: 12px;
+      font-size: 14px; font-weight: 590; cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition: transform 0.12s ease, filter 0.15s ease;
+    }
+    .new-chat:hover { filter: brightness(1.05); }
+    .new-chat:active { transform: scale(0.98); }
+    .conv-head {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+      color: var(--text-3); padding: 14px 20px 6px;
+    }
+    .conv-list { flex: 1; overflow-y: auto; padding: 0 10px 10px; }
+    .conv {
+      position: relative;
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 9px 12px; margin: 2px 0;
+      border-radius: 11px; cursor: pointer;
+      transition: background 0.14s ease;
+    }
+    .conv:hover { background: var(--hover); }
+    .conv.active { background: var(--active-bg); }
+    .conv .title {
+      font-size: 13.5px; font-weight: 500; color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 18px;
+    }
+    .conv.active .title { color: var(--accent); font-weight: 590; }
+    .conv .meta { font-size: 11px; color: var(--text-3); }
+    .conv .del {
+      position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+      width: 24px; height: 24px; border: none; background: transparent; cursor: pointer;
+      color: var(--text-3); border-radius: 7px; opacity: 0; display: grid; place-items: center;
+      transition: opacity 0.14s ease, background 0.14s ease, color 0.14s ease;
+    }
+    .conv:hover .del { opacity: 1; }
+    .conv .del:hover { background: rgba(255,59,48,0.14); color: var(--err); }
+    .conv-empty { padding: 18px 20px; color: var(--text-3); font-size: 13px; }
+    .sidebar-foot {
+      border-top: 1px solid var(--sep);
+      padding: 10px 16px;
+      display: flex; align-items: center; gap: 10px;
+      font-size: 11px; color: var(--text-3);
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .sidebar-foot .run { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .icon-btn {
+      border: none; background: transparent; color: var(--text-2); cursor: pointer;
+      width: 32px; height: 32px; border-radius: 9px; display: grid; place-items: center;
+      transition: background 0.14s ease, color 0.14s ease;
+    }
+    .icon-btn:hover { background: var(--hover); color: var(--text); }
+
+    /* ───────────────────────── Workspace ───────────────────────── */
+    .workspace {
+      grid-column: 2; min-width: 0;
+      display: grid; grid-template-rows: auto minmax(0, 1fr);
       position: relative;
     }
-    .agent-card .name {
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      font-size: 13px;
-    }
-    .agent-card .role-planner { color: var(--planner); }
-    .agent-card .role-coder { color: var(--coder); }
-    .agent-card .role-e2e { color: var(--reviewer); }
-    .agent-card .role-reviewer { color: var(--reviewer); }
-    .agent-card .role-qa { color: var(--qa); }
-    .agent-card .role-researcher { color: var(--ok); }
-    .agent-card .model {
-      color: var(--muted);
-      font-size: 11px;
-      font-family: ui-monospace, monospace;
-      margin-top: 2px;
-      word-break: break-all;
-    }
-    .agent-card .status {
-      display: inline-block;
-      margin-top: 8px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-    }
-    .status-idle    { background: #25305a; color: var(--muted); }
-    .status-queued  { background: #4a3a18; color: var(--warn); animation: pulse 1.6s infinite; }
-    .status-thinking{ background: #2a3a72; color: var(--accent); animation: pulse 1.2s infinite; }
-    .status-searching{ background: #15402e; color: var(--ok); animation: pulse 1.1s infinite; }
-    .status-error   { background: #5a2533; color: var(--err); }
-    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.55; } }
 
-    .agent-card .provider-badge {
-      display: inline-block;
-      font-size: 10px;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      padding: 1px 6px;
-      border-radius: 3px;
-      border: 1px solid var(--line);
-      color: var(--muted);
-      margin-left: 6px;
-      vertical-align: middle;
+    /* Lineage graph */
+    .lineage {
+      position: relative;
+      height: 196px;
+      margin: 14px 16px 0;
+      border-radius: var(--radius);
+      background: var(--surface);
+      backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--sep);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
     }
-    .agent-card .provider-ollama { color: var(--qa); border-color: #2a4a72; }
-    .agent-card .provider-azure_foundry { color: var(--planner); border-color: #4a3a72; }
-    .agent-card .qmeta { color: var(--warn); font-size: 11px; margin-top: 4px; }
-
-    .queue-meter {
-      color: var(--muted);
-      font-size: 12px;
+    .lineage-bar {
+      position: absolute; top: 0; left: 0; right: 0;
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 14px; z-index: 4; pointer-events: none;
+    }
+    .lineage-bar .title { font-size: 12px; font-weight: 600; color: var(--text-2); letter-spacing: 0.01em; }
+    .lineage-bar .spacer { flex: 1; }
+    .lineage-bar .chip {
+      pointer-events: auto;
+      font-size: 11px; color: var(--text-2);
+      background: var(--surface-2); border: 1px solid var(--sep);
+      padding: 4px 9px; border-radius: 999px;
       font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      margin-right: 12px;
     }
-    .queue-meter b { color: var(--warn); font-weight: 600; }
+    .lineage-bar .chip b { color: var(--accent); font-weight: 650; }
+    .activity-toggle {
+      pointer-events: auto;
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 550; color: var(--text-2);
+      background: var(--surface-2); border: 1px solid var(--sep);
+      padding: 5px 11px; border-radius: 999px; cursor: pointer;
+      transition: color 0.14s ease, border-color 0.14s ease, background 0.14s ease;
+    }
+    .activity-toggle:hover { color: var(--text); border-color: var(--sep-strong); }
+    .app.activity-open .activity-toggle { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 40%, transparent); background: var(--active-bg); }
+    .activity-toggle .badge {
+      min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+      background: var(--accent); color: #fff; font-size: 10px; font-weight: 700;
+      display: none; place-items: center;
+    }
+    .activity-toggle .badge.show { display: grid; }
 
-    main {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 0;
-      height: calc(100vh - 56px - 130px);
-      min-height: 400px;
+    #lineage-svg { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+    #lineage-nodes { position: absolute; inset: 0; z-index: 2; }
+    .edge { fill: none; stroke: var(--sep-strong); stroke-width: 1.5; transition: stroke 0.3s ease, stroke-width 0.3s ease; }
+    .edge.active { stroke: url(#edgeGrad); stroke-width: 2.6; stroke-dasharray: 7 7; animation: flow 0.7s linear infinite; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 60%, transparent)); }
+    @keyframes flow { to { stroke-dashoffset: -28; } }
+
+    .node {
+      position: absolute; z-index: 2; transform: translate(-50%, -50%);
+      display: flex; flex-direction: column; align-items: center; gap: 5px;
+      cursor: default;
     }
-    .pane { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
-    .pane:last-child { border-right: none; }
-    .pane-title {
-      padding: 8px 16px;
-      font-size: 11px;
-      letter-spacing: 0.1em;
-      color: var(--muted);
-      text-transform: uppercase;
-      border-bottom: 1px solid var(--line);
-      background: var(--panel);
+    .node .bubble {
+      display: flex; align-items: center; gap: 7px;
+      padding: 7px 12px; border-radius: 13px;
+      background: var(--surface-solid); border: 1px solid var(--sep);
+      box-shadow: var(--shadow-sm);
+      white-space: nowrap;
+      transition: box-shadow 0.25s ease, transform 0.25s ease, border-color 0.25s ease;
     }
-    .pane-body { flex: 1; overflow-y: auto; padding: 12px 16px; }
+    .node .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--role); box-shadow: 0 0 0 0 var(--role); flex: none; }
+    .node .nm { font-size: 12.5px; font-weight: 590; letter-spacing: -0.01em; }
+    .node .st { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; min-height: 12px; }
+    .node.you .bubble { background: linear-gradient(135deg, color-mix(in srgb, var(--principal) 16%, var(--surface-solid)), var(--surface-solid)); }
+    .node[data-st="thinking"] .bubble,
+    .node[data-st="searching"] .bubble,
+    .node[data-st="queued"] .bubble { border-color: color-mix(in srgb, var(--role) 55%, transparent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--role) 16%, transparent), var(--shadow-sm); }
+    .node[data-st="thinking"] .dot,
+    .node[data-st="searching"] .dot { animation: dotpulse 1.1s ease-in-out infinite; }
+    .node[data-st="error"] .bubble { border-color: var(--err); }
+    .node.pulse .bubble { animation: nodepop 0.5s ease; }
+    @keyframes nodepop { 0% { transform: scale(1); } 40% { transform: scale(1.08); } 100% { transform: scale(1); } }
+    @keyframes dotpulse { 0%,100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--role) 60%, transparent); } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--role) 0%, transparent); } }
 
     /* Chat */
-    .msg { margin-bottom: 14px; }
-    .msg .who { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; font-weight: 600; margin-bottom: 3px; }
-    .msg.principal .who { color: var(--principal); }
-    .msg.planner   .who { color: var(--planner); }
-    .msg .content { white-space: pre-wrap; word-wrap: break-word; }
+    .chat { grid-row: 2; min-height: 0; display: flex; flex-direction: column; }
+    .chat-scroll { flex: 1; overflow-y: auto; padding: 22px 0 8px; scroll-behavior: smooth; }
+    .chat-rail { max-width: 760px; margin: 0 auto; padding: 0 24px; }
 
-    #chat-input-row {
-      display: flex;
-      gap: 8px;
-      padding: 10px 16px;
-      border-top: 1px solid var(--line);
-      background: var(--panel);
+    .empty {
+      height: 100%; min-height: 320px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      text-align: center; gap: 8px; color: var(--text-2);
     }
+    .empty .glyph {
+      width: 60px; height: 60px; border-radius: 16px; margin-bottom: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--planner));
+      display: grid; place-items: center; color: #fff;
+      box-shadow: var(--shadow);
+    }
+    .empty h2 { font-size: 22px; font-weight: 640; color: var(--text); margin: 0; letter-spacing: -0.02em; }
+    .empty p { margin: 0; font-size: 14px; max-width: 380px; }
+    .suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+    .suggest button {
+      background: var(--surface); border: 1px solid var(--sep); color: var(--text);
+      padding: 9px 14px; border-radius: 12px; font-size: 13px; cursor: pointer;
+      backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+      transition: border-color 0.14s ease, transform 0.12s ease;
+    }
+    .suggest button:hover { border-color: var(--sep-strong); }
+    .suggest button:active { transform: scale(0.97); }
+
+    .row { display: flex; margin-bottom: 14px; }
+    .row.user { justify-content: flex-end; }
+    .row.agent { justify-content: flex-start; }
+    .bubble-wrap { max-width: 86%; display: flex; flex-direction: column; }
+    .row.user .bubble-wrap { align-items: flex-end; }
+    .who { display: flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--text-2); margin: 0 4px 4px; }
+    .who .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--role, var(--text-3)); }
+    .bubble-msg {
+      padding: 11px 15px; border-radius: 20px;
+      font-size: 14.5px; line-height: 1.5;
+      white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere;
+      box-shadow: var(--shadow-sm);
+    }
+    .row.user .bubble-msg {
+      background: linear-gradient(180deg, var(--accent), color-mix(in srgb, var(--accent) 86%, #000));
+      color: var(--on-accent); border-bottom-right-radius: 7px;
+    }
+    .row.agent .bubble-msg {
+      background: var(--surface-solid); color: var(--text);
+      border: 1px solid var(--sep); border-bottom-left-radius: 7px;
+    }
+    .row.agent.error .bubble-msg { border-color: var(--err); color: var(--err); }
+
+    .typing .bubble-msg { display: inline-flex; gap: 5px; align-items: center; padding: 14px 16px; }
+    .typing .d { width: 7px; height: 7px; border-radius: 50%; background: var(--text-3); animation: blink 1.2s infinite both; }
+    .typing .d:nth-child(2) { animation-delay: 0.18s; }
+    .typing .d:nth-child(3) { animation-delay: 0.36s; }
+    @keyframes blink { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+
+    /* Composer */
+    .composer { padding: 8px 0 20px; }
+    .composer-rail { max-width: 760px; margin: 0 auto; padding: 0 24px; }
+    .composer-box {
+      display: flex; align-items: flex-end; gap: 8px;
+      background: var(--surface); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+      border: 1px solid var(--sep-strong); border-radius: 24px;
+      padding: 7px 7px 7px 18px;
+      box-shadow: var(--shadow);
+      transition: border-color 0.16s ease;
+    }
+    .composer-box:focus-within { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
     #chat-input {
-      flex: 1;
-      background: var(--panel-2);
-      border: 1px solid var(--line);
-      color: var(--text);
-      border-radius: 4px;
-      padding: 8px 10px;
-      font-family: inherit;
-      font-size: 14px;
-      resize: none;
-      min-height: 40px;
-      max-height: 160px;
+      flex: 1; border: none; background: transparent; color: var(--text);
+      font-family: inherit; font-size: 15px; line-height: 1.45;
+      resize: none; max-height: 184px; padding: 8px 0; outline: none;
     }
-    #chat-input:focus { outline: none; border-color: var(--accent); }
+    #chat-input::placeholder { color: var(--text-3); }
     #chat-send {
-      background: var(--accent);
-      color: #0b1020;
-      border: none;
-      border-radius: 4px;
-      padding: 0 16px;
-      font-weight: 600;
-      cursor: pointer;
+      flex: none; width: 38px; height: 38px; border-radius: 50%;
+      background: var(--accent); color: var(--on-accent); border: none; cursor: pointer;
+      display: grid; place-items: center;
+      transition: transform 0.12s ease, opacity 0.15s ease, background 0.15s ease;
     }
-    #chat-send:disabled { opacity: 0.5; cursor: not-allowed; }
+    #chat-send:hover { background: var(--accent-press); }
+    #chat-send:active { transform: scale(0.92); }
+    #chat-send:disabled { opacity: 0.4; cursor: default; background: var(--text-3); }
+    .composer-hint { text-align: center; font-size: 11px; color: var(--text-3); margin-top: 8px; }
 
-    /* Event feed */
-    .evt {
-      border-bottom: 1px dashed var(--line);
-      padding: 8px 0;
-      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-      font-size: 12px;
+    /* ───────────────────────── Activity panel ───────────────────────── */
+    .activity {
+      grid-column: 3; min-width: 0; overflow: hidden;
+      background: var(--surface); backdrop-filter: var(--blur); -webkit-backdrop-filter: var(--blur);
+      border-left: 1px solid var(--sep);
+      display: flex; flex-direction: column;
     }
-    .evt .head { color: var(--muted); margin-bottom: 2px; }
-    .evt .arrow { color: var(--accent); }
-    .evt .kind { color: var(--warn); margin-left: 6px; }
-    .evt .body { color: var(--text); white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow-y: auto; }
-    .evt.thinking .body { color: var(--muted); font-style: italic; }
-    .evt.task_assignment .kind { color: var(--coder); }
-    .evt.task_result .kind { color: var(--ok); }
-    .evt.search .kind { color: var(--ok); }
-    .evt.search .body a { color: var(--accent); text-decoration: none; }
+    .activity-inner { width: 372px; height: 100%; display: flex; flex-direction: column; }
+    .activity-head {
+      display: flex; align-items: center; gap: 8px;
+      padding: 16px 16px 12px; border-bottom: 1px solid var(--sep);
+    }
+    .activity-head h3 { font-size: 15px; font-weight: 620; margin: 0; flex: 1; letter-spacing: -0.01em; }
+    .activity-body { flex: 1; overflow-y: auto; padding: 12px 14px; }
+    .activity-empty { color: var(--text-3); font-size: 13px; text-align: center; padding: 40px 20px; }
+
+    .evt { margin-bottom: 10px; border-radius: 13px; border: 1px solid var(--sep); background: var(--surface-2); overflow: hidden; animation: evtin 0.28s ease; }
+    @keyframes evtin { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .evt .head { display: flex; align-items: center; gap: 6px; padding: 8px 11px; font-size: 11.5px; }
+    .evt .from, .evt .to { font-weight: 600; color: var(--text); }
+    .evt .arrow { color: var(--text-3); }
+    .evt .kind { margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; padding: 2px 7px; border-radius: 6px; background: var(--hover); color: var(--text-2); }
+    .evt.task_assignment .kind { background: color-mix(in srgb, var(--coder) 18%, transparent); color: var(--coder); }
+    .evt.task_result .kind { background: color-mix(in srgb, var(--ok) 18%, transparent); color: var(--ok); }
+    .evt.thinking .kind { background: color-mix(in srgb, var(--planner) 18%, transparent); color: var(--planner); }
+    .evt.search .kind { background: color-mix(in srgb, var(--researcher) 20%, transparent); color: var(--researcher); }
+    .evt.error .kind { background: color-mix(in srgb, var(--err) 18%, transparent); color: var(--err); }
+    .evt .body { padding: 0 11px 10px; font-size: 12.5px; color: var(--text-2); white-space: pre-wrap; word-break: break-word; line-height: 1.45; max-height: 240px; overflow-y: auto; }
+    .evt.thinking .body { font-style: italic; }
+    .evt .body a { color: var(--accent); text-decoration: none; }
+    .evt .body a:hover { text-decoration: underline; }
+
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 0px minmax(0,1fr) var(--activity-w, 0px); }
+      .app.activity-open { --activity-w: 320px; }
+    }
   </style>
 </head>
 <body>
-  <header>
-    <h1>Roster <span>— runtime dashboard</span></h1>
-    <div style="display:flex;align-items:center">
-      <span class="queue-meter" id="queue-meter">queue: —</span>
-      <span class="meta" id="run-id">run: —</span>
-      <button id="reset-btn" title="Discard the current run and start a fresh one">Reset run</button>
-    </div>
-  </header>
-
-  <section id="agents"></section>
-
-  <main>
-    <div class="pane">
-      <div class="pane-title">Principal ⇄ Planner</div>
-      <div class="pane-body" id="chat-log"></div>
-      <div id="chat-input-row">
-        <textarea id="chat-input" placeholder="Talk to the Planner… (Enter to send, Shift+Enter for newline)"></textarea>
-        <button id="chat-send">Send</button>
+  <div class="app" id="app">
+    <!-- Sidebar : chat history -->
+    <aside class="sidebar">
+      <div class="sidebar-inner">
+        <div class="brand">
+          <div class="logo">R</div>
+          <div>
+            <h1>Roster</h1>
+            <div class="sub">multi-agent runtime</div>
+          </div>
+        </div>
+        <button class="new-chat" id="new-chat">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          New chat
+        </button>
+        <div class="conv-head">History</div>
+        <div class="conv-list" id="conv-list"></div>
+        <div class="sidebar-foot">
+          <span class="run" id="run-id" title="">run: —</span>
+          <button class="icon-btn" id="theme-btn" title="Toggle appearance">
+            <svg id="theme-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          </button>
+        </div>
       </div>
-    </div>
-    <div class="pane">
-      <div class="pane-title">Inter-agent activity</div>
-      <div class="pane-body" id="event-feed"></div>
-    </div>
-  </main>
+    </aside>
+
+    <!-- Workspace : lineage + chat -->
+    <section class="workspace">
+      <div class="lineage" id="lineage">
+        <div class="lineage-bar">
+          <span class="title">Agent lineage</span>
+          <span class="spacer"></span>
+          <span class="chip" id="queue-chip">queue —</span>
+          <button class="activity-toggle" id="activity-toggle" title="Inter-agent activity">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M4 12h10M4 17h7"/></svg>
+            Activity
+            <span class="badge" id="activity-badge">0</span>
+          </button>
+        </div>
+        <svg id="lineage-svg">
+          <defs>
+            <linearGradient id="edgeGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="var(--accent)"/>
+              <stop offset="100%" stop-color="var(--planner)"/>
+            </linearGradient>
+          </defs>
+        </svg>
+        <div id="lineage-nodes"></div>
+      </div>
+
+      <div class="chat">
+        <div class="chat-scroll" id="chat-scroll">
+          <div class="chat-rail" id="chat-rail"></div>
+        </div>
+        <div class="composer">
+          <div class="composer-rail">
+            <div class="composer-box">
+              <textarea id="chat-input" rows="1" placeholder="Message the Planner…"></textarea>
+              <button id="chat-send" title="Send (Enter)">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+              </button>
+            </div>
+            <div class="composer-hint">You talk to the Planner — it dispatches the specialists.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Activity : inter-agent feed (collapsible) -->
+    <aside class="activity">
+      <div class="activity-inner">
+        <div class="activity-head">
+          <h3>Inter-agent activity</h3>
+          <button class="icon-btn" id="activity-close" title="Close">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+        <div class="activity-body" id="activity-body">
+          <div class="activity-empty">No agent traffic yet. Dispatches, results and searches appear here.</div>
+        </div>
+      </div>
+    </aside>
+  </div>
 
 <script>
 const $ = (id) => document.getElementById(id);
-const agentsEl = $("agents");
-const chatLog = $("chat-log");
-const feed = $("event-feed");
+const app = $("app");
+const chatRail = $("chat-rail");
+const chatScroll = $("chat-scroll");
+const convList = $("conv-list");
+const activityBody = $("activity-body");
 const input = $("chat-input");
 const sendBtn = $("chat-send");
 const runIdEl = $("run-id");
 
-const agentState = new Map();
+const ROLE_ORDER = ["planner", "coder", "e2e", "reviewer", "qa", "researcher"];
+const KNOWN_ROLE = new Map();   // agent name -> role
+const agentState = new Map();   // agent name -> latest status payload
+const edgeEls = new Map();      // "a|b" -> <path>
+const nodeEls = new Map();      // key -> { root, st }
 let queueState = null;
+let activeConvId = null;
+let pendingUser = null;
+let awaiting = false;
+let activityCount = 0;
+let typingEl = null;
 
-function renderQueueMeter() {
-  const el = $("queue-meter");
-  if (!queueState) { el.textContent = "queue: —"; return; }
-  const { max_concurrency, waiting, active } = queueState;
-  el.innerHTML = `queue: <b>${active}</b> active · <b>${waiting}</b> waiting · cap ${max_concurrency}`;
-}
-
-function renderAgents() {
-  agentsEl.innerHTML = "";
-  for (const a of agentState.values()) {
-    const card = document.createElement("div");
-    card.className = "agent-card";
-    const provider = a.provider || "";
-    const qmeta =
-      a.status === "queued"
-        ? `<div class="qmeta">⏳ queued${a.queue_waiting ? ` · ${a.queue_waiting} ahead` : ""}</div>`
-        : a.queued
-        ? `<div class="qmeta" style="color:var(--muted)">via queue</div>`
-        : "";
-    const searchBadge = a.search ? `<span class="provider-badge" style="color:var(--ok);border-color:#15402e">🌐 search</span>` : "";
-    card.innerHTML = `
-      <div class="name role-${escapeAttr(a.role)}">${escapeHtml(a.name)} <span style="color:var(--muted);font-weight:400">· ${escapeHtml(a.role)}</span><span class="provider-badge provider-${escapeAttr(provider)}">${escapeHtml(provider)}</span>${searchBadge}</div>
-      <div class="model">${escapeHtml(a.model || "")}<br/>${escapeHtml(a.endpoint || "")}${a.system_prompt_chars ? `<br/>sys-prompt: ${a.system_prompt_chars.toLocaleString()} chars` : ""}</div>
-      <span class="status status-${escapeAttr(a.status)}">${escapeHtml(a.status)}</span>
-      ${qmeta}
-    `;
-    agentsEl.appendChild(card);
-  }
-}
-
-function appendChat(who, content) {
-  const div = document.createElement("div");
-  div.className = "msg " + who;
-  div.innerHTML = `<div class="who">${who}</div><div class="content"></div>`;
-  div.querySelector(".content").textContent = content;
-  chatLog.appendChild(div);
-  chatLog.scrollTop = chatLog.scrollHeight;
-}
-
-function appendEvent(e) {
-  const div = document.createElement("div");
-  const kind = e.kind || "event";
-  div.className = "evt";
-  let head, body;
-  if (e.kind === "agent.message" || e.kind === "user.message") {
-    const sub = e.subkind || "message";
-    head = `<span>${escapeHtml(e.from)}</span> <span class="arrow">→</span> <span>${escapeHtml(e.to)}</span><span class="kind">${escapeHtml(sub)}</span>`;
-    body = e.content || "";
-    div.classList.add(sub);
-  } else if (e.kind === "agent.status") {
-    const q = e.status === "queued" && e.queue_waiting ? ` (${e.queue_waiting} ahead)` : "";
-    head = `<span>${escapeHtml(e.agent)}</span><span class="kind">status: ${escapeHtml(e.status)}${q}</span>`;
-    body = `${e.model || ""}${e.error ? "  error: " + e.error : ""}`;
-  } else if (e.kind === "run.started") {
-    head = `<span class="kind">run.started</span>`;
-    body = e.runId || "";
-    runIdEl.textContent = "run: " + (e.runId || "—");
-    if (e.queue) { queueState = e.queue; renderQueueMeter(); }
-  } else if (e.kind === "runtime.error") {
-    head = `<span class="kind" style="color:var(--err)">runtime.error</span>`;
-    body = (e.scope ? `[${e.scope}] ` : "") + (e.error || "");
-  } else if (e.kind === "tool.search") {
-    div.classList.add("search");
-    const phase = e.phase || "";
-    head = `<span>${escapeHtml(e.agent)}</span><span class="kind">🌐 search · ${escapeHtml(phase)}</span>`;
-    if (phase === "query") {
-      body = `"${e.query || ""}"`;
-    } else if (phase === "results") {
-      const items = (e.results || []).map((r, i) => `[${i + 1}] ${r.title}\n    ${r.url}`).join("\n");
-      body = `${e.count || 0} results for "${e.query || ""}"\n${items}`;
-    } else if (phase === "error") {
-      body = `error for "${e.query || ""}": ${e.error || ""}`;
-    } else {
-      body = JSON.stringify(e);
-    }
-  } else {
-    head = `<span class="kind">${escapeHtml(kind)}</span>`;
-    body = JSON.stringify(e);
-  }
-  div.innerHTML = `<div class="head">${head}</div><div class="body"></div>`;
-  div.querySelector(".body").textContent = body;
-  feed.appendChild(div);
-  feed.scrollTop = feed.scrollHeight;
-}
-
+/* ───────────── helpers ───────────── */
 function escapeHtml(s) {
-  return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  return String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
 }
-function escapeAttr(s) { return String(s ?? "").replace(/[^a-z0-9_-]/gi, ""); }
+function roleOf(name) { return name === "principal" ? "principal" : (KNOWN_ROLE.get(name) || name); }
+function nodeKey(name) { return name === "principal" ? "__you__" : name; }
+function timeAgo(ts) {
+  if (!ts) return "";
+  const s = Math.max(0, (Date.now() / 1000) - ts);
+  if (s < 60) return "just now";
+  if (s < 3600) return Math.floor(s / 60) + "m ago";
+  if (s < 86400) return Math.floor(s / 3600) + "h ago";
+  if (s < 604800) return Math.floor(s / 86400) + "d ago";
+  return new Date(ts * 1000).toLocaleDateString();
+}
+function atBottom() { return chatScroll.scrollHeight - chatScroll.scrollTop - chatScroll.clientHeight < 120; }
+function scrollChat(force) { if (force || atBottom()) chatScroll.scrollTop = chatScroll.scrollHeight; }
 
-async function loadAgents() {
-  const r = await fetch("/api/agents");
-  const j = await r.json();
-  runIdEl.textContent = "run: " + j.runId;
-  if (j.queue) { queueState = j.queue; renderQueueMeter(); }
-  agentState.clear();
-  for (const a of j.agents) agentState.set(a.name, a);
-  renderAgents();
+/* ───────────── lineage graph ───────────── */
+function lineageKeys() {
+  const present = [...agentState.keys()];
+  const ordered = ROLE_ORDER.filter((r) => present.includes(r));
+  for (const n of present) if (!ordered.includes(n)) ordered.push(n);
+  return ["__you__", ...ordered];
+}
+function buildLineage() {
+  const host = $("lineage-nodes");
+  const svg = $("lineage-svg");
+  host.innerHTML = "";
+  [...svg.querySelectorAll("path")].forEach((p) => p.remove());
+  nodeEls.clear(); edgeEls.clear();
+  const keys = lineageKeys();
+
+  // edges: you→planner, planner→each specialist
+  const edges = [];
+  if (keys.includes("planner")) {
+    edges.push(["__you__", "planner"]);
+    for (const k of keys) if (k !== "__you__" && k !== "planner") edges.push(["planner", k]);
+  } else {
+    for (const k of keys) if (k !== "__you__") edges.push(["__you__", k]);
+  }
+  for (const [a, b] of edges) {
+    const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    p.setAttribute("class", "edge");
+    svg.appendChild(p);
+    edgeEls.set(a + "|" + b, p);
+  }
+
+  for (const key of keys) {
+    const name = key === "__you__" ? "You" : key;
+    const role = key === "__you__" ? "principal" : roleOf(key);
+    const el = document.createElement("div");
+    el.className = "node" + (key === "__you__" ? " you" : "");
+    el.dataset.key = key; el.dataset.st = "idle";
+    el.style.setProperty("--role", "var(--" + role + ")");
+    el.innerHTML = '<div class="bubble"><span class="dot"></span><span class="nm"></span></div><span class="st"></span>';
+    el.querySelector(".nm").textContent = key === "__you__" ? "You" : name;
+    host.appendChild(el);
+    nodeEls.set(key, { root: el, st: el.querySelector(".st") });
+  }
+  layoutLineage();
+}
+function layoutLineage() {
+  const host = $("lineage-nodes");
+  const svg = $("lineage-svg");
+  const W = host.clientWidth, H = host.clientHeight;
+  if (!W || !H) return;
+  svg.setAttribute("width", W); svg.setAttribute("height", H);
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  const keys = lineageKeys();
+  const pos = {};
+  // Reserve the top band for the floating bar (queue chip + Activity button) and
+  // keep a bottom margin so the lower row never clips.
+  const padTop = 58, padBot = 18;
+  const avail = Math.max(60, H - padTop - padBot);
+  const midY = padTop + avail / 2;
+  const amp = avail / 2 - 6;
+  pos["__you__"] = { x: Math.max(56, W * 0.075), y: midY };
+  const hasPlanner = keys.includes("planner");
+  if (hasPlanner) pos["planner"] = { x: Math.max(168, W * 0.25), y: midY };
+  const specs = keys.filter((k) => k !== "__you__" && k !== "planner");
+  const x0 = W * (hasPlanner ? 0.48 : 0.34), x1 = W - Math.max(82, W * 0.085);
+  specs.forEach((k, i) => {
+    const t = specs.length <= 1 ? 0.5 : i / (specs.length - 1);
+    const x = x0 + (x1 - x0) * t;
+    const off = (specs.length > 1) ? (i % 2 === 0 ? -1 : 1) : 0;
+    const y = midY + off * amp;
+    pos[k] = { x, y };
+  });
+  for (const [key, p] of Object.entries(pos)) {
+    const n = nodeEls.get(key); if (!n) continue;
+    n.root.style.left = p.x + "px"; n.root.style.top = p.y + "px";
+  }
+  for (const [id, path] of edgeEls.entries()) {
+    const [a, b] = id.split("|");
+    const pa = pos[a], pb = pos[b]; if (!pa || !pb) continue;
+    const dx = Math.max(40, Math.abs(pb.x - pa.x) * 0.5);
+    path.setAttribute("d", `M ${pa.x} ${pa.y} C ${pa.x + dx} ${pa.y}, ${pb.x - dx} ${pb.y}, ${pb.x} ${pb.y}`);
+  }
+}
+function setNodeStatus(name, status) {
+  const n = nodeEls.get(nodeKey(name)); if (!n) return;
+  n.root.dataset.st = status || "idle";
+  n.st.textContent = (status && status !== "idle") ? status : "";
+}
+function flashEdge(aName, bName) {
+  const a = nodeKey(aName), b = nodeKey(bName);
+  const path = edgeEls.get(a + "|" + b) || edgeEls.get(b + "|" + a);
+  if (path) {
+    path.classList.add("active");
+    clearTimeout(path._t);
+    path._t = setTimeout(() => path.classList.remove("active"), 3600);
+  }
+  for (const key of [a, b]) {
+    const n = nodeEls.get(key); if (!n) continue;
+    n.root.classList.remove("pulse"); void n.root.offsetWidth; n.root.classList.add("pulse");
+  }
 }
 
-function connectWS() {
-  const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
-  ws.onmessage = (msg) => {
-    const e = JSON.parse(msg.data);
-    if (e.kind === "agent.status") {
-      const cur = agentState.get(e.agent) || { name: e.agent };
-      Object.assign(cur, e);
-      agentState.set(e.agent, cur);
-      // Derive a rough live queue meter from agent transitions.
-      refreshQueueFromAgents();
-      renderAgents();
-    } else if (e.kind === "run.started" && e.queue) {
-      queueState = e.queue;
-      renderQueueMeter();
-    }
-    appendEvent(e);
-  };
-  ws.onclose = () => setTimeout(connectWS, 1500);
+/* ───────────── queue meter ───────────── */
+function renderQueue() {
+  const el = $("queue-chip");
+  if (!queueState) { el.textContent = "queue —"; return; }
+  const { active = 0, waiting = 0, max_concurrency = 1 } = queueState;
+  el.innerHTML = `queue <b>${active}</b>·<b>${waiting}</b> / ${max_concurrency}`;
 }
-
-function refreshQueueFromAgents() {
+function deriveQueue() {
   if (!queueState) return;
   let waiting = 0, active = 0;
   for (const a of agentState.values()) {
@@ -378,49 +651,302 @@ function refreshQueueFromAgents() {
     else if (a.status === "thinking" && a.queued) active++;
   }
   queueState = { ...queueState, waiting, active };
-  renderQueueMeter();
+  renderQueue();
 }
 
-async function send() {
-  const text = input.value.trim();
-  if (!text) return;
-  input.value = "";
-  appendChat("principal", text);
-  sendBtn.disabled = true;
-  try {
-    const r = await fetch("/api/chat", {
-      method: "POST",
-      headers: {"content-type": "application/json"},
-      body: JSON.stringify({message: text}),
-    });
-    let j;
-    try { j = await r.json(); }
-    catch (_) { j = {error: `HTTP ${r.status}: ${(await r.text()).slice(0, 200)}`}; }
-    if (j.error) appendChat("planner", "[error] " + j.error);
-    else appendChat("planner", j.reply || "");
-  } catch (e) {
-    appendChat("planner", "[network error] " + e.message);
-  } finally {
-    sendBtn.disabled = false;
-    input.focus();
+/* ───────────── chat rendering ───────────── */
+function clearEmpty() { const e = chatRail.querySelector(".empty"); if (e) e.remove(); }
+function showEmpty() {
+  chatRail.innerHTML = `
+    <div class="empty">
+      <div class="glyph"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <h2>What should the team build?</h2>
+      <p>Talk to the Planner. It decomposes your goal and dispatches the Coder, Reviewer, QA, E2E and Researcher.</p>
+      <div class="suggest">
+        <button>Add a /health endpoint, then E2E-test it</button>
+        <button>Research how the US indexes did today</button>
+        <button>Review the diff on my feature branch</button>
+      </div>
+    </div>`;
+  chatRail.querySelectorAll(".suggest button").forEach((b) =>
+    b.addEventListener("click", () => { input.value = b.textContent; autoGrow(); input.focus(); }));
+}
+function addUserBubble(content) {
+  clearEmpty();
+  const row = document.createElement("div");
+  row.className = "row user";
+  row.innerHTML = '<div class="bubble-wrap"><div class="bubble-msg"></div></div>';
+  row.querySelector(".bubble-msg").textContent = content;
+  chatRail.appendChild(row);
+  scrollChat(true);
+}
+function addAgentBubble(name, content, opts = {}) {
+  clearEmpty();
+  const role = roleOf(name);
+  const row = document.createElement("div");
+  row.className = "row agent" + (opts.error ? " error" : "");
+  row.innerHTML =
+    `<div class="bubble-wrap"><div class="who"><span class="dot" style="background:var(--${escapeHtml(role)})"></span>${escapeHtml(name)}</div><div class="bubble-msg"></div></div>`;
+  row.querySelector(".bubble-msg").textContent = content;
+  chatRail.appendChild(row);
+  scrollChat();
+}
+function showTyping() {
+  if (typingEl) return;
+  clearEmpty();
+  typingEl = document.createElement("div");
+  typingEl.className = "row agent typing";
+  typingEl.innerHTML =
+    '<div class="bubble-wrap"><div class="who"><span class="dot" style="background:var(--planner)"></span>planner</div><div class="bubble-msg"><span class="d"></span><span class="d"></span><span class="d"></span></div></div>';
+  chatRail.appendChild(typingEl);
+  scrollChat(true);
+}
+function hideTyping() { if (typingEl) { typingEl.remove(); typingEl = null; } }
+
+/* ───────────── activity feed ───────────── */
+function bumpActivity() {
+  activityCount++;
+  const badge = $("activity-badge");
+  if (!app.classList.contains("activity-open")) { badge.textContent = activityCount; badge.classList.add("show"); }
+}
+function clearActivityEmpty() { const e = activityBody.querySelector(".activity-empty"); if (e) e.remove(); }
+function addActivity(e) {
+  clearActivityEmpty();
+  const div = document.createElement("div");
+  div.className = "evt";
+  let head = "", body = "", cls = "";
+  if (e.kind === "agent.message") {
+    const sub = e.subkind || "message";
+    cls = sub;
+    head = `<span class="from">${escapeHtml(e.from)}</span><span class="arrow">→</span><span class="to">${escapeHtml(e.to)}</span><span class="kind">${escapeHtml(sub.replace("_", " "))}</span>`;
+    body = e.content || "";
+  } else if (e.kind === "tool.search") {
+    cls = "search";
+    const phase = e.phase || "";
+    head = `<span class="from">${escapeHtml(e.agent)}</span><span class="kind">search · ${escapeHtml(phase)}</span>`;
+    if (phase === "query") body = "“" + (e.query || "") + "”";
+    else if (phase === "results") body = `${e.count || 0} results for “${e.query || ""}”\n` + (e.results || []).map((r, i) => `${i + 1}. ${r.title}\n   ${r.url}`).join("\n");
+    else if (phase === "error") body = `error for “${e.query || ""}”: ${e.error || ""}`;
+  } else if (e.kind === "runtime.error") {
+    cls = "error";
+    head = `<span class="from">runtime</span><span class="kind">error</span>`;
+    body = (e.scope ? "[" + e.scope + "] " : "") + (e.error || "");
+  } else { return; }
+  div.className = "evt " + cls;
+  div.innerHTML = `<div class="head">${head}</div><div class="body"></div>`;
+  const bodyEl = div.querySelector(".body");
+  if (cls === "search" && (e.results || []).length) {
+    bodyEl.innerHTML = body.split("\n").map((ln) => {
+      const m = ln.match(/(https?:\/\/\S+)/);
+      return m ? escapeHtml(ln).replace(escapeHtml(m[1]), `<a href="${escapeHtml(m[1])}" target="_blank" rel="noopener noreferrer">${escapeHtml(m[1])}</a>`) : escapeHtml(ln);
+    }).join("\n");
+  } else {
+    bodyEl.textContent = body;
+  }
+  const stick = activityBody.scrollHeight - activityBody.scrollTop - activityBody.clientHeight < 80;
+  activityBody.appendChild(div);
+  if (stick) activityBody.scrollTop = activityBody.scrollHeight;
+  bumpActivity();
+}
+
+/* ───────────── unified event handler ───────────── */
+function handleEvent(e, live = true) {
+  switch (e.kind) {
+    case "user.message": {
+      flashEdge("principal", "planner");
+      if (live && pendingUser !== null && e.content === pendingUser) pendingUser = null;
+      else addUserBubble(e.content || "");
+      break;
+    }
+    case "agent.message": {
+      if (e.from && e.to) flashEdge(e.from, e.to);
+      const sub = e.subkind || "message";
+      if (e.to === "principal" && sub === "message") {
+        hideTyping();
+        addAgentBubble(e.from || "planner", e.content || "");
+      } else {
+        addActivity(e);
+      }
+      break;
+    }
+    case "agent.status": {
+      const cur = agentState.get(e.agent) || { name: e.agent };
+      Object.assign(cur, e);
+      agentState.set(e.agent, cur);
+      if (e.role) KNOWN_ROLE.set(e.agent, e.role);
+      if (!nodeEls.has(nodeKey(e.agent))) buildLineage();
+      setNodeStatus(e.agent, e.status);
+      deriveQueue();
+      break;
+    }
+    case "tool.search": {
+      addActivity(e);
+      break;
+    }
+    case "runtime.error": {
+      if (live) { hideTyping(); }
+      addActivity(e);
+      break;
+    }
+    case "run.started": {
+      if (e.runId) { runIdEl.textContent = "run: " + e.runId; runIdEl.title = e.runId; }
+      if (e.queue) { queueState = e.queue; renderQueue(); }
+      break;
+    }
   }
 }
 
+/* ───────────── data loading ───────────── */
+async function loadAgents() {
+  try {
+    const j = await (await fetch("/api/agents")).json();
+    runIdEl.textContent = "run: " + j.runId; runIdEl.title = j.runId;
+    activeConvId = j.runId;
+    if (j.queue) { queueState = j.queue; renderQueue(); }
+    agentState.clear(); KNOWN_ROLE.clear();
+    for (const a of j.agents) { agentState.set(a.name, a); KNOWN_ROLE.set(a.name, a.role); }
+    buildLineage();
+  } catch (_) {}
+}
+async function loadConversations() {
+  try {
+    const j = await (await fetch("/api/conversations")).json();
+    renderConversations(j.conversations || [], j.active);
+  } catch (_) {}
+}
+function renderConversations(list, active) {
+  convList.innerHTML = "";
+  if (!list.length) { convList.innerHTML = '<div class="conv-empty">No conversations yet.</div>'; return; }
+  for (const c of list) {
+    const div = document.createElement("div");
+    div.className = "conv" + (c.id === (active || activeConvId) ? " active" : "");
+    div.innerHTML =
+      `<div class="title"></div><div class="meta">${c.messages || 0} msg · ${timeAgo(c.updated_at)}</div>` +
+      `<button class="del" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg></button>`;
+    div.querySelector(".title").textContent = c.title || "New conversation";
+    div.addEventListener("click", (ev) => { if (ev.target.closest(".del")) return; openConversation(c.id); });
+    div.querySelector(".del").addEventListener("click", (ev) => { ev.stopPropagation(); deleteConversation(c.id); });
+    convList.appendChild(div);
+  }
+}
+function resetView() {
+  chatRail.innerHTML = ""; activityBody.innerHTML = '<div class="activity-empty">No agent traffic yet. Dispatches, results and searches appear here.</div>';
+  activityCount = 0; $("activity-badge").classList.remove("show");
+  hideTyping(); pendingUser = null;
+  for (const k of nodeEls.keys()) setNodeStatus(k === "__you__" ? "principal" : k, "idle");
+}
+function replay(events) {
+  resetView();
+  for (const e of events) handleEvent(e, false);
+  for (const k of nodeEls.keys()) setNodeStatus(k === "__you__" ? "principal" : k, "idle");
+  if (!chatRail.children.length) showEmpty();
+  scrollChat(true);
+}
+async function openConversation(id) {
+  if (id === activeConvId) { return; }
+  try {
+    const j = await (await fetch(`/api/conversations/${encodeURIComponent(id)}/activate`, { method: "POST" })).json();
+    activeConvId = id;
+    runIdEl.textContent = "run: " + id; runIdEl.title = id;
+    replay(j.events || []);
+    await loadConversations();
+  } catch (_) {}
+}
+async function newChat() {
+  try {
+    const j = await (await fetch("/api/reset", { method: "POST" })).json();
+    activeConvId = j.runId;
+    runIdEl.textContent = "run: " + j.runId; runIdEl.title = j.runId;
+    resetView(); showEmpty();
+    await loadConversations();
+    input.focus();
+  } catch (_) {}
+}
+async function deleteConversation(id) {
+  if (!confirm("Delete this conversation? This cannot be undone.")) return;
+  try {
+    const j = await (await fetch(`/api/conversations/${encodeURIComponent(id)}`, { method: "DELETE" })).json();
+    if (id === activeConvId) { activeConvId = j.active; resetView(); showEmpty(); }
+    await loadConversations();
+  } catch (_) {}
+}
+async function loadActive() {
+  if (!activeConvId) return;
+  try {
+    const j = await (await fetch(`/api/conversations/${encodeURIComponent(activeConvId)}`)).json();
+    if (j.events && j.events.length) replay(j.events); else showEmpty();
+  } catch (_) { showEmpty(); }
+}
+
+/* ───────────── send ───────────── */
+function autoGrow() { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 184) + "px"; }
+async function send() {
+  const text = input.value.trim();
+  if (!text || awaiting) return;
+  input.value = ""; autoGrow();
+  pendingUser = text;
+  addUserBubble(text);
+  showTyping();
+  awaiting = true; sendBtn.disabled = true;
+  try {
+    const r = await fetch("/api/chat", {
+      method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ message: text }),
+    });
+    let j;
+    try { j = await r.json(); } catch (_) { j = { error: `HTTP ${r.status}` }; }
+    hideTyping();
+    if (j && j.error) addAgentBubble("planner", "⚠︎ " + j.error, { error: true });
+  } catch (e) {
+    hideTyping();
+    addAgentBubble("planner", "⚠︎ network error: " + e.message, { error: true });
+  } finally {
+    awaiting = false; sendBtn.disabled = false; input.focus();
+  }
+}
+
+/* ───────────── websocket ───────────── */
+function connectWS() {
+  const ws = new WebSocket((location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws");
+  ws.onmessage = (msg) => { try { handleEvent(JSON.parse(msg.data), true); } catch (_) {} };
+  ws.onclose = () => setTimeout(connectWS, 1500);
+}
+
+/* ───────────── wiring ───────────── */
 sendBtn.addEventListener("click", send);
-input.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); }
+input.addEventListener("input", autoGrow);
+input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+$("new-chat").addEventListener("click", newChat);
+$("activity-toggle").addEventListener("click", () => {
+  app.classList.toggle("activity-open");
+  if (app.classList.contains("activity-open")) { activityCount = 0; $("activity-badge").classList.remove("show"); }
 });
+$("activity-close").addEventListener("click", () => app.classList.remove("activity-open"));
 
-$("reset-btn").addEventListener("click", async () => {
-  if (!confirm("Discard the current run? Chat history and in-memory agent state will be cleared.")) return;
-  await fetch("/api/reset", {method: "POST"});
-  chatLog.innerHTML = "";
-  feed.innerHTML = "";
+function applyTheme(t) {
+  const root = document.documentElement;
+  if (t === "system") root.removeAttribute("data-theme"); else root.setAttribute("data-theme", t);
+  localStorage.setItem("roster-theme", t);
+}
+$("theme-btn").addEventListener("click", () => {
+  const cur = localStorage.getItem("roster-theme") || "system";
+  const dark = document.documentElement.getAttribute("data-theme") === "dark" ||
+    (cur === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+  applyTheme(dark ? "light" : "dark");
+  setTimeout(layoutLineage, 60);
+});
+applyTheme(localStorage.getItem("roster-theme") || "system");
+
+let rT;
+window.addEventListener("resize", () => { clearTimeout(rT); rT = setTimeout(layoutLineage, 80); });
+
+(async function init() {
   await loadAgents();
-});
-
-loadAgents();
-connectWS();
+  await loadConversations();
+  await loadActive();
+  connectWS();
+  layoutLineage();
+})();
 </script>
 </body>
 </html>

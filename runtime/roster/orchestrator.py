@@ -167,8 +167,10 @@ MAX_DISPATCHES_PER_TURN = 3
 class Run:
     """One conversation = one run. Holds the planner + sub-agents + provenance."""
 
-    def __init__(self, config_path: str | Path) -> None:
-        self.run_id = new_run_id()
+    def __init__(self, config_path: str | Path, run_id: str | None = None) -> None:
+        # `run_id` is supplied when reopening a persisted conversation so the new
+        # in-memory run rebinds to its existing provenance log and history.
+        self.run_id = run_id or new_run_id()
         self.prov = ProvenanceLog(runs_dir(), self.run_id)
         cfg: RuntimeConfig = load_config(config_path)
 
@@ -240,6 +242,32 @@ class Run:
 
     def all_agents(self) -> list[Agent]:
         return [self.planner, *self.subagents.values()]
+
+    def resume_from_events(self, events: list[dict[str, Any]]) -> None:
+        """Seed the planner's chat history from a persisted conversation so it can
+        continue where it left off.
+
+        Only the principal⇄planner transcript is restored — sub-agent histories are
+        ephemeral and start fresh (acceptable for this MVP). Each prior principal
+        message becomes a ``user`` turn and each final planner reply an ``assistant``
+        turn, preserving the system prompt already at ``history[0]``.
+        """
+        for e in events:
+            kind = e.get("kind")
+            if kind == "user.message":
+                content = str(e.get("content") or "")
+                if content:
+                    self.planner.history.append({"role": "user", "content": content})
+            elif (
+                kind == "agent.message"
+                and e.get("to") == "principal"
+                and e.get("subkind", "message") == "message"
+            ):
+                content = str(e.get("content") or "")
+                if content:
+                    self.planner.history.append(
+                        {"role": "assistant", "content": content}
+                    )
 
     def queue_stats(self) -> dict[str, Any]:
         st = self.llm_queue.stats()

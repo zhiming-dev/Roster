@@ -1,0 +1,30 @@
+# Build context is the repo root (see runtime/docker-compose.yml).
+# Keep the image small and avoid copying local state / secrets.
+.git
+.gitignore
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+*.egg-info/
+
+# Local Python envs
+runtime/.venv/
+.venv/
+venv/
+
+# Local data: SQLite DB + run artifacts are recreated on the /data volume
+runtime/data/
+*.db
+*.sqlite
+*.sqlite3
+runs/
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Secrets
+**/.env
+**/*.env
