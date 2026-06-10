@@ -23,28 +23,60 @@ DISPATCH_RE = re.compile(
 )
 
 
-def runtime_preamble() -> str:
+def runtime_preamble(*, can_search: bool = False, has_searcher: bool = False) -> str:
     """A dynamic preamble prepended to every agent's system prompt.
 
     Two jobs: (1) tell the model what *today* is, so a model whose training data
     predates the system clock stops treating recent dates as "the future"; and
-    (2) be explicit that this MVP wires up NO tools, so agents must not fabricate
-    live data / tool output.
+    (2) describe the agent's *actual* tool situation so it neither fabricates data
+    nor — just as bad — refuses to use a tool it genuinely has.
+
+    The tool paragraph is tailored to the agent:
+
+    * ``can_search`` — this agent holds the web-search tool itself (its `SEARCH:`
+      usage is spelled out later in the suffix). It must USE it for live facts.
+    * ``has_searcher`` — this agent can't search directly but can DISPATCH to a
+      specialist that can (the Planner's case).
+    * neither — genuinely tool-less; it must say so rather than invent data.
     """
     now = _dt.datetime.now().astimezone()
-    return (
+    date_part = (
         "## Current context\n\n"
         f"The current date is {now:%Y-%m-%d} ({now:%A}). Treat this as *today*. "
         "Any date on or before today is in the PAST — never call a past or present "
         "date 'the future'.\n\n"
-        "You have **no tools** in this runtime: no web/internet access, no file "
-        "system, no code execution, no live data feeds. You therefore CANNOT look "
-        "up real-time or external facts (market prices, news, weather, scores, "
-        "etc.). If a request needs such data, say so plainly and DO NOT invent "
-        "specific numbers, quotes, headlines, or source citations. Offer what you "
-        "genuinely can do — structure, methodology, which sources the principal "
-        "should consult — instead of fabricating an answer that looks real."
     )
+    if can_search:
+        tools_part = (
+            "You DO have a **web-search tool** in this runtime (its `SEARCH:` usage is "
+            "described below). USE it whenever a request needs live or external facts "
+            "(news, market prices, weather, scores, recent events) — never claim you "
+            "lack web access. You do NOT have a file system, code execution, or other "
+            "live data feeds. Base every factual claim on actual search results and "
+            "cite their URLs; if a search returns nothing or fails, say so plainly and "
+            "DO NOT invent numbers, quotes, headlines, or citations."
+        )
+    elif has_searcher:
+        tools_part = (
+            "You have no tools you invoke directly, but you CAN dispatch to specialists "
+            "that have a real web-search tool (see the dispatch menu below). For any "
+            "live or external fact (news, market prices, weather, scores, recent "
+            "events), DISPATCH to a web-searching specialist rather than answering from "
+            "memory — and never tell the principal the system 'cannot' search, because "
+            "it can. Do NOT invent specific numbers, quotes, headlines, or citations "
+            "yourself; let the specialist gather them."
+        )
+    else:
+        tools_part = (
+            "You have **no tools** in this runtime: no web/internet access, no file "
+            "system, no code execution, no live data feeds. You therefore CANNOT look "
+            "up real-time or external facts (market prices, news, weather, scores, "
+            "etc.). If a request needs such data, say so plainly and DO NOT invent "
+            "specific numbers, quotes, headlines, or source citations. Offer what you "
+            "genuinely can do — structure, methodology, which sources the principal "
+            "should consult — instead of fabricating an answer that looks real."
+        )
+    return date_part + tools_part
 
 
 PLANNER_RUNTIME_HEAD = """\
@@ -194,8 +226,6 @@ class Run:
                 return None
             return self.search_provider if "search" in agent_cfg.tools else None
 
-        preamble = runtime_preamble()
-
         # Specialist metadata for the planner's (dynamic) dispatch menu.
         specialists: list[tuple[str, str, bool]] = []
         for name, agent_cfg in cfg.agents.items():
@@ -206,9 +236,15 @@ class Run:
             )
             specialists.append((name, blurb, _search_for(agent_cfg) is not None))
 
-        planner_suffix = preamble + "\n\n" + build_planner_suffix(specialists)
+        has_searcher = any(can_search for _, _, can_search in specialists)
 
         planner_cfg = cfg.agents["planner"]
+        planner_preamble = runtime_preamble(
+            can_search=_search_for(planner_cfg) is not None,
+            has_searcher=has_searcher,
+        )
+        planner_suffix = planner_preamble + "\n\n" + build_planner_suffix(specialists)
+
         self.planner = Agent.from_config(
             planner_cfg,
             runtime_suffix=planner_suffix,
@@ -220,7 +256,7 @@ class Run:
             name: Agent.from_config(
                 agent_cfg,
                 runtime_suffix=(
-                    preamble
+                    runtime_preamble(can_search=_search_for(agent_cfg) is not None)
                     + "\n\n"
                     + build_subagent_suffix(_search_for(agent_cfg) is not None)
                 ),
