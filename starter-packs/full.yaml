@@ -1,0 +1,19 @@
+# Full starter pack — everything available
+# Includes all core capabilities plus all optional packs
+name: full
+description: Everything — all core capabilities plus all optional packs
+capabilities:
+  - core-foundation
+  - core-planning
+  - core-pr
+  - core-docs
+  - sdlc
+  - quality
+  - idea-management
+  - meetings
+  - accessibility
+  - coverage
+  - sprint-planning   # pulls in `scheduling` transitively (hard dep) — picker + capacity + planner pair
+  - scrum-master      # weekly sprint-cycle orchestration; soft-deps on sprint-planning + sdlc above (both already in this pack, so the soft-deps resolve at runtime)
+  # Add domain-specific capabilities below as they become available
+  # - pr-reviewer # WIP — not yet available

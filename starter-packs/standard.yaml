@@ -1,0 +1,10 @@
+# Standard starter pack — recommended for most teams
+# Includes validation, planning, PR operations, and core docs
+name: standard
+description: Recommended pack — validation, planning, PR ops, core agents and docs
+capabilities:
+  - core-foundation
+  - core-planning
+  - core-pr
+  - core-docs
+  - sdlc

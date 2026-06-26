@@ -1,0 +1,10 @@
+# Local per-developer memory files
+.memory-bank/activeContext.md
+.memory-bank/learnings.md
+.memory-bank/userDirectives.md
+
+# Keep memory docs template tracked
+!.memory-bank/README.md
+
+# Spec Kit generated feature working dirs (optional - remove if you commit specs)
+# specs/

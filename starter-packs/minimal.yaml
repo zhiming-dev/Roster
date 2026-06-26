@@ -1,0 +1,6 @@
+# Minimal starter pack — just validation infrastructure
+# Use this if your team only wants pre-commit hooks and CI gates
+name: minimal
+description: Validation-only pack — pre-commit hooks, CI pipeline, and core validators
+capabilities:
+  - core-foundation

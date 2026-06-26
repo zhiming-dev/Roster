@@ -1,0 +1,16 @@
+{
+  "//": "Example MCP configuration. Add only servers you are approved to use.",
+  "//compliance": "Do not add internal-only or unapproved MCP servers. Replace placeholders before use.",
+  "servers": {
+    "filesystem-example": {
+      "//": "Local filesystem MCP server example (public reference server).",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "${workspaceFolder}"]
+    },
+    "your-approved-server": {
+      "//": "Replace with an MCP server your project is approved to use.",
+      "type": "http",
+      "url": "https://example.com/mcp"
+    }
+  }
+}
