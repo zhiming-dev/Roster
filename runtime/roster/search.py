@@ -8,8 +8,10 @@ more backends (Bing, Brave, Azure grounding) can drop in later.
 
 from __future__ import annotations
 
+import asyncio
 import html
 import logging
+import random
 import re
 import urllib.parse
 from dataclasses import dataclass
@@ -64,6 +66,7 @@ def format_results(query: str, results: list[SearchResult]) -> str:
 class DuckDuckGoSearch:
     name = "duckduckgo"
     _ENDPOINT = "https://html.duckduckgo.com/html/"
+    _MAX_ATTEMPTS = 3
 
     def __init__(self, timeout_s: float = 15.0) -> None:
         self._client = httpx.AsyncClient(
@@ -81,16 +84,71 @@ class DuckDuckGoSearch:
         await self._client.aclose()
 
     async def search(self, query: str, max_results: int = 5) -> list[SearchResult]:
-        try:
-            r = await self._client.post(self._ENDPOINT, data={"q": query})
-            r.raise_for_status()
-        except httpx.HTTPError as exc:
-            raise SearchError(f"DuckDuckGo request failed: {exc}") from exc
-        return _parse_ddg_html(r.text, max_results)
+        q = _clean_query(query)
+        if not q:
+            return []
+        delay = 0.6
+        last_error = "unknown error"
+        for attempt in range(self._MAX_ATTEMPTS):
+            try:
+                r = await self._client.post(self._ENDPOINT, data={"q": q})
+                r.raise_for_status()
+            except httpx.HTTPError as exc:
+                last_error = f"request failed: {exc}"
+            else:
+                # DuckDuckGo answers automated traffic with a 202 / 'anomaly'
+                # challenge page. That is a *throttle*, NOT an empty result set —
+                # surfacing it as an error stops the agent from reporting the
+                # misleading 'no results found' when it was actually blocked.
+                if not _ddg_is_throttled(r):
+                    return _parse_ddg_html(r.text, max_results)
+                last_error = (
+                    "DuckDuckGo served a bot/anomaly challenge (HTTP "
+                    f"{r.status_code}); it rate-limits automated queries aggressively"
+                )
+            if attempt < self._MAX_ATTEMPTS - 1:
+                await asyncio.sleep(delay + random.uniform(0.0, 0.3))
+                delay *= 2
+        raise SearchError(
+            f"DuckDuckGo search failed: {last_error}. Tip: set TAVILY_API_KEY "
+            "(free tier at tavily.com) for a reliable key-based backend — the "
+            "no-key DuckDuckGo endpoint throttles quickly."
+        )
 
 
 def _strip_tags(s: str) -> str:
     return html.unescape(re.sub(r"<[^>]+>", "", s)).strip()
+
+
+def _clean_query(q: str) -> str:
+    """Tidy an LLM-authored query: collapse whitespace and strip wrapping quotes.
+
+    Models routinely wrap the whole query in quotes; sent verbatim to DuckDuckGo
+    that becomes an exact-phrase match which returns nothing. Dropping a single
+    outer pair fixes a common zero-results cause.
+    """
+    q = " ".join(q.split())
+    if len(q) >= 2 and q[0] in "\"'“”«»" and q[-1] in "\"'“”«»":
+        q = q[1:-1].strip()
+    return q
+
+
+_DDG_THROTTLE_MARKERS = ("anomaly", "if this error persists", "unusual traffic")
+
+
+def _ddg_is_throttled(r: httpx.Response) -> bool:
+    """True when DDG served a bot/anomaly challenge instead of real results.
+
+    DuckDuckGo throttles automated traffic with HTTP 202 and/or an 'anomaly'
+    modal page (often HTTP 200 but with no result markup). Both must be treated
+    as a failure rather than a legitimate empty result set.
+    """
+    if r.status_code == 202:
+        return True
+    if "result__a" in r.text:  # real results markup present → not throttled
+        return False
+    low = r.text.lower()
+    return any(m in low for m in _DDG_THROTTLE_MARKERS)
 
 
 def _decode_ddg_url(href: str) -> str:
@@ -185,4 +243,10 @@ def build_search_provider(cfg: SearchConfig) -> SearchProvider | None:
             return DuckDuckGoSearch()
         return TavilySearch(cfg.api_key)
     # auto without a key, or explicitly duckduckgo
+    log.warning(
+        "search: using the no-key DuckDuckGo backend. DuckDuckGo rate-limits "
+        "automated queries aggressively, so you may see repeated 'rate-limited' "
+        "search errors. Set TAVILY_API_KEY (free tier at tavily.com) for reliable "
+        "results."
+    )
     return DuckDuckGoSearch()

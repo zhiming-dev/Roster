@@ -34,6 +34,12 @@ qa-agent/e2e-test/failure-screenshots/
 runs/
 !runs/.gitkeep
 
+# Local per-developer memory bank (keep only the template README tracked)
+.memory-bank/activeContext.md
+.memory-bank/learnings.md
+.memory-bank/userDirectives.md
+!.memory-bank/README.md
+
 # SQLite persistence (chat history DB + run artifacts on the Docker volume)
 runtime/data/
 *.db

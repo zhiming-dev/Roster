@@ -3,6 +3,19 @@
 > Entry point for any LLM coding agent (Copilot, Claude Code, Cursor, Aider, etc.) reading
 > this repository. Read this file first.
 
+## Session start reading order
+
+Before doing repository work in a new chat session, read these in order:
+
+1. [`.github/copilot-instructions.md`](./.github/copilot-instructions.md) — build/style conventions
+2. [`.agent/instructions/collaboration-rules.instructions.md`](./.agent/instructions/collaboration-rules.instructions.md)
+3. [`.agent/instructions/memory-bank.instructions.md`](./.agent/instructions/memory-bank.instructions.md)
+4. [`.memory-bank/activeContext.md`](./.memory-bank/activeContext.md) and
+   [`.memory-bank/learnings.md`](./.memory-bank/learnings.md)
+
+Per-agent VS Code chat modes live in [`.github/chatmodes/`](./.github/chatmodes/) — one per Roster
+role (Planner, Coder, QA, Reviewer, Researcher, E2E) plus a `repo-expert` Q&A mode.
+
 ## What this repo is
 
 **Roster** — a human-in-the-loop, hierarchical multi-agent framework for software-engineering

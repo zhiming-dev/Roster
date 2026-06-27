@@ -175,6 +175,11 @@ You CAN search the web. To do so, end a reply with EXACTLY one line:
 
     SEARCH: <your search query>
 
+Keep the query SHORT — 3–6 keywords, the way a person types into a search box
+(e.g. `S&P 500 close June 26 2026`). Do NOT wrap it in quotation marks and do NOT
+write a long full-sentence query: overly long or quoted queries reliably return
+zero results.
+
 The runtime runs the search and feeds results back as the next turn, prefixed with
 `[search results]`. Then continue — search again (up to 3 times total) or write your
 final answer with NO `SEARCH:` line. Base every factual claim (prices, dates, news,
