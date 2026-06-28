@@ -2,25 +2,23 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime as _dt
 import logging
-import re
 from pathlib import Path
 from typing import Any
 
+from . import events
 from .agent import Agent
 from .bus import bus
 from .config import RuntimeConfig, load_config
+from .protocol import parse_planner_turn
 from .provenance import ProvenanceLog, new_run_id, runs_dir
 from .queue import LlmQueue
+from .run_state import OrchestrationState, RunStatus, TurnResult
 from .search import SearchProvider, build_search_provider
 
 log = logging.getLogger("roster.orchestrator")
-
-DISPATCH_RE = re.compile(
-    r"^\s*DISPATCH\s*:\s*(?P<role>[a-z_][a-z0-9_-]*)\s*:\s*(?P<task>.+?)\s*$",
-    re.IGNORECASE,
-)
 
 
 def runtime_preamble(*, can_search: bool = False, has_searcher: bool = False) -> str:
@@ -123,33 +121,38 @@ def build_planner_suffix(specialists: list[tuple[str, str, bool]]) -> str:
         + "\n".join(lines)
         + """
 
-To dispatch, end your reply with EXACTLY one line in this form (no backticks, no prose
-after it):
+You ORCHESTRATE; you never do the work yourself. After any brief reasoning, end your reply
+with directive lines the runtime executes (no backticks):
 
-    DISPATCH:<role>:<one-line task for the specialist>
+    PLAN: <one-line summary of how you split the goal>     (optional)
+    DISPATCH:<role>:<one-line task>                        (ONE line per sub-task)
+    ASK: <a single question for the principal>             (only when truly blocked)
 
-When you DISPATCH, the runtime invokes that specialist and feeds their reply back to you
-as the next user turn, prefixed with `[<role> reports]:`. You may then dispatch again,
-or — if you have enough — write your final reply to the principal with NO `DISPATCH:`
-line, and the runtime will deliver it.
-
-Hard rules:
-- Maximum 3 dispatches per principal message. Stay concise.
-- For simple conversational messages (greetings, status questions), DO NOT dispatch —
-  just reply directly.
-- Only dispatch to a specialist whose described expertise actually FITS the task. Match
-  the work to the right role:
-    · `e2e` drives a real browser against a RUNNING build — only after `coder` has landed
-      a change. Never use it to check facts, prose, or research.
-    · `qa` validates / fact-checks outputs (reports, claims, research findings) and can
-      search the web to verify. Use it to vet a report's accuracy — NOT to run a browser.
+How it works:
+- Decompose a non-trivial goal into the FEWEST sub-tasks that genuinely differ and emit a
+  DISPATCH line for EACH — several at once. Independent dispatches run IN PARALLEL. Match each
+  task to the role whose expertise fits.
+- The runtime runs them and feeds every result back as your next turn, each prefixed
+  `[<role> reports]:`. Review them CRITICALLY: if a result is wrong, inconsistent, or
+  unverified, DISPATCH again — to the same specialist to dig deeper, or to `qa` to fact-check —
+  before you answer. After the first results return you may run up to two more rounds to verify.
+- When you have enough, write the principal ONE synthesized final answer covering every part
+  of their request, with NO PLAN/DISPATCH/ASK line.
+- For a simple conversational message (greeting, status), just reply directly — no directives.
+- Match work to the right role:
     · `researcher` gathers live/external facts via web search.
+    · `qa` validates / fact-checks another agent's output (and can search to verify) — use it
+      to vet accuracy, NOT to run a browser.
+    · `e2e` drives a real browser against a RUNNING build — only after `coder` lands a change.
 """
         + web_rule
-        + """- Do not write a `DISPATCH:` line in the middle of your reply. It must be the last line.
-- You never perform destructive actions yourself. If a specialist's task would be T3/T4
-  (irreversible), say so to the principal and ask for explicit confirmation in chat
-  before dispatching.
+        + """- If a tool failed during the run (e.g. a web search was rate-limited or returned a bot
+  challenge), TELL the principal what failed and the likely remedy (e.g. set TAVILY_API_KEY for a
+  reliable search backend) — don't only say you couldn't verify.
+- Use ASK sparingly — only when you cannot proceed safely; the runtime relays it to the
+  principal and you continue once they answer.
+- You never perform destructive (irreversible, T3/T4) actions yourself. If a sub-task would be
+  irreversible, say so and ask the principal for explicit confirmation in chat first.
 """
     )
 
@@ -198,7 +201,11 @@ def build_subagent_suffix(can_search: bool) -> str:
     middle = _SUBAGENT_SEARCH if can_search else ""
     return _SUBAGENT_HEAD + middle + _SUBAGENT_TAIL
 
-MAX_DISPATCHES_PER_TURN = 3
+# Per principal message: one decomposition/fan-out round, then up to MAX_CRITIQUE
+# critique/verification rounds, then a synthesized answer. MAX_PLANNER_TURNS is the hard
+# ceiling on planner turns (fan-out + critique rounds + synthesis + slack).
+MAX_PLANNER_TURNS = 6
+MAX_CRITIQUE = 2
 
 
 class Run:
@@ -209,6 +216,9 @@ class Run:
         # in-memory run rebinds to its existing provenance log and history.
         self.run_id = run_id or new_run_id()
         self.prov = ProvenanceLog(runs_dir(), self.run_id)
+        # Orchestration state persists ACROSS principal messages so a mid-task `ASK`
+        # can suspend and the next message can resume the same run.
+        self.orch_state = OrchestrationState(max_critique=MAX_CRITIQUE)
         cfg: RuntimeConfig = load_config(config_path)
 
         if "planner" not in cfg.agents:
@@ -344,92 +354,170 @@ class Run:
             **{"from": src, "to": dst, "content": content},
         )
 
-    def _parse_dispatch(self, reply: str) -> tuple[str | None, str | None, str]:
-        """Return (role, task, reply_without_dispatch_line)."""
-        lines = reply.rstrip().splitlines()
-        if not lines:
-            return None, None, reply
-        m = DISPATCH_RE.match(lines[-1])
-        if not m:
-            return None, None, reply
-        role = m.group("role").lower()
-        task = m.group("task").strip()
-        pre = "\n".join(lines[:-1]).rstrip()
-        return role, task, pre
+    async def _run_dispatch(self, role: str, task: str, round_idx: int) -> tuple[str, str]:
+        """Dispatch one task to a specialist and return (role, reply). Safe to gather()."""
+        await self._publish_message("planner", role, task, subkind="task_assignment")
+        self.prov.emit("task.dispatched", actor="planner", to=role, task=task, round=round_idx)
+        await events.emit_task_dispatched(to=role, task=task, round=round_idx)
+        subagent = self.subagents[role]
+        sub_reply = await subagent.chat(task)
+        self.prov.emit(
+            "task.result", actor=role, model=subagent.cfg.provider.target, content=sub_reply
+        )
+        await self._publish_message(role, "planner", sub_reply, subkind="task_result")
+        return role, sub_reply
 
-    async def handle_principal_message(self, user_text: str) -> str:
+    async def handle_principal_message(self, user_text: str) -> TurnResult:
+        # If the run is paused on a clarification, THIS message is the answer — resume the
+        # same orchestration rather than starting fresh.
+        resuming = self.orch_state.awaiting_input
+
         await bus.publish(
             "user.message", **{"from": "principal", "to": "planner", "content": user_text}
         )
         self.prov.emit("principal.message", actor="principal", content=user_text)
 
-        next_input = user_text
-        final_reply = ""
+        if resuming:
+            await events.emit_clarification_answered(user_text)
+            self.prov.emit("clarification.answered", actor="principal", answer=user_text)
+            self.orch_state.resume()
+            next_input = f"[principal answers]: {user_text}\n\nContinue the task."
+        else:
+            self.orch_state.reset()
+            next_input = user_text
 
-        for turn in range(MAX_DISPATCHES_PER_TURN + 1):
+        final_reply = ""
+        status = "done"
+
+        for turn_idx in range(MAX_PLANNER_TURNS):
             reply = await self.planner.chat(next_input)
             self.prov.emit(
                 "planner.reply",
                 actor="planner",
-                turn=turn,
+                turn=turn_idx,
                 model=self.planner.cfg.provider.target,
                 content=reply,
             )
+            turn = parse_planner_turn(reply)
 
-            role, task, pre = self._parse_dispatch(reply)
-
-            if role is None:
-                await self._publish_message("planner", "principal", reply)
-                final_reply = reply
+            # 1) Mid-task clarification: ask the principal and SUSPEND. The next message
+            #    resumes this same run (the planner's history + orchestration state persist).
+            if turn.ask is not None:
+                if turn.prose:
+                    await self._publish_message(
+                        "planner", "principal", turn.prose, subkind="thinking"
+                    )
+                await self._publish_message("planner", "principal", turn.ask)
+                await events.emit_clarification_requested(turn.ask)
+                self.prov.emit("clarification.requested", actor="planner", question=turn.ask)
+                resume_phase = (
+                    RunStatus.CRITIQUING if self.orch_state.gathered else RunStatus.PLANNING
+                )
+                self.orch_state.suspend(resume_phase)
+                final_reply = turn.ask
+                status = "awaiting_input"
                 break
 
-            if role not in self.subagents:
-                # Planner dispatched to an unknown specialist — feed back as error.
-                err = (
-                    f"[runtime] Unknown specialist '{role}'. Available: "
-                    f"{', '.join(self.subagents)}."
+            # 2) No directives → the planner's final answer to the principal.
+            if not turn.dispatches:
+                answer = turn.prose or reply
+                await self._publish_message("planner", "principal", answer)
+                final_reply = answer
+                self.orch_state.reset()
+                break
+
+            # 3) The planner wants to dispatch. The first dispatching turn is the
+            #    decomposition/fan-out; every later one is a critique/verification round
+            #    (the planner pushing back on a result before it answers).
+            is_critique = self.orch_state.gathered
+            if is_critique and not self.orch_state.can_critique():
+                next_input = (
+                    "[runtime] Critique budget reached — do NOT dispatch again. Write the "
+                    "best-effort final answer now and explicitly flag any unresolved "
+                    "uncertainty (no DISPATCH/ASK line)."
                 )
-                if pre:
-                    await self._publish_message("planner", "principal", pre)
-                next_input = err
-                self.prov.emit("dispatch.invalid", actor="runtime", role=role, task=task)
                 continue
 
-            if pre:
-                # Planner included a thought before dispatch — surface it.
-                await self._publish_message("planner", "principal", pre, subkind="thinking")
+            valid = [(r, t) for (r, t) in turn.dispatches if r in self.subagents]
+            unknown = [r for (r, _t) in turn.dispatches if r not in self.subagents]
 
-            await self._publish_message(
-                "planner", role, task, subkind="task_assignment"
+            if turn.prose:
+                await self._publish_message("planner", "principal", turn.prose, subkind="thinking")
+
+            if not is_critique:
+                if turn.plan_summary or len(turn.dispatches) > 1:
+                    tasks_payload = [{"role": r, "task": t} for (r, t) in turn.dispatches]
+                    await events.emit_plan_proposed(
+                        self.run_id, turn.plan_summary or "", tasks_payload
+                    )
+                    self.prov.emit(
+                        "plan.proposed",
+                        actor="planner",
+                        summary=turn.plan_summary or "",
+                        tasks=tasks_payload,
+                    )
+            else:
+                # The planner is pushing back on a prior result — record the critique.
+                targets = [r for (r, _t) in valid]
+                concern = turn.prose or turn.plan_summary or "a prior result needs checking"
+                action = "verify" if any(r in ("qa", "reviewer") for r in targets) else "re-dispatch"
+                round_no = self.orch_state.critique_used + 1
+                await events.emit_critique_round(
+                    round=round_no, concern=concern, action=action,
+                    to=targets[0] if targets else None,
+                )
+                self.prov.emit(
+                    "critique.round", actor="planner", round=round_no,
+                    concern=concern, action=action, to=targets[0] if targets else None,
+                )
+
+            if not valid:
+                next_input = (
+                    f"[runtime] Unknown specialist(s): {', '.join(unknown)}. "
+                    f"Available: {', '.join(self.subagents)}."
+                )
+                self.prov.emit("dispatch.invalid", actor="runtime", roles=unknown)
+                continue
+
+            # Independent dispatches run concurrently (governed by the LLM queue's
+            # max_concurrency; raise it for agents on separate/cloud backends).
+            round_idx = self.orch_state.critique_used if is_critique else 0
+            results = await asyncio.gather(
+                *(self._run_dispatch(r, t, round_idx) for (r, t) in valid)
             )
-            self.prov.emit(
-                "task.dispatched", actor="planner", to=role, task=task
-            )
+            if is_critique:
+                self.orch_state.note_critique()
+            else:
+                self.orch_state.gathered = True
 
-            subagent = self.subagents[role]
-            sub_reply = await subagent.chat(task)
-            self.prov.emit(
-                "task.result",
-                actor=role,
-                model=subagent.cfg.provider.target,
-                content=sub_reply,
-            )
-            await self._publish_message(role, "planner", sub_reply, subkind="task_result")
+            parts = [f"[{role} reports]:\n{rep}" for (role, rep) in results]
+            if unknown:
+                parts.append(f"[runtime] Unknown specialist(s) ignored: {', '.join(unknown)}.")
+            next_input = "\n\n".join(parts)
 
-            next_input = f"[{role} reports]:\n{sub_reply}"
-
-            if turn == MAX_DISPATCHES_PER_TURN - 1:
+            # Critique nudge: make the planner vet the results before it answers.
+            if self.orch_state.can_critique():
+                remaining = self.orch_state.max_critique - self.orch_state.critique_used
                 next_input += (
-                    "\n\n[runtime] You have one dispatch left this turn. "
-                    "Wrap up and give the principal your final answer with no DISPATCH line."
+                    "\n\n[runtime] Now CRITICALLY evaluate these results for consistency, "
+                    "plausibility, and completeness. If a factual claim needs independent "
+                    "confirmation, DISPATCH `qa` to verify it; if a result looks wrong, "
+                    "re-DISPATCH the specialist. If everything checks out, write the final "
+                    f"synthesized answer with no directives. ({remaining} critique round(s) left.)"
+                )
+            else:
+                next_input += (
+                    "\n\n[runtime] Critique budget reached. Write the principal ONE synthesized "
+                    "final answer now covering every part of the request, explicitly flagging "
+                    "any unresolved uncertainty — with no DISPATCH or ASK line."
                 )
         else:
-            # Loop exhausted without a final answer.
             final_reply = (
-                "[runtime] Dispatch budget exhausted before the planner produced a "
-                "final reply. Please re-prompt or simplify the request."
+                "[runtime] The planner did not converge on a final answer within the round "
+                "budget. Please re-prompt or simplify the request."
             )
             await self._publish_message("planner", "principal", final_reply)
             self.prov.emit("turn.budget_exhausted", actor="runtime")
+            self.orch_state.reset()
 
-        return final_reply
+        return TurnResult(status=status, text=final_reply)

@@ -35,6 +35,19 @@ _PROVIDER_ALIASES = {
     "azure_foundry": "azure_foundry",
     "azure-foundry": "azure_foundry",
     "azure_openai": "azure_foundry",
+    # OpenAI-compatible backends (xAI/grok, OpenAI, DeepSeek, Together, Groq,
+    # Anthropic's OpenAI-compatible surface). One provider, base_url + Bearer key.
+    "openai": "openai_compatible",
+    "openai_compatible": "openai_compatible",
+    "openai-compatible": "openai_compatible",
+    "compat": "openai_compatible",
+    "xai": "openai_compatible",
+    "grok": "openai_compatible",
+    "deepseek": "openai_compatible",
+    "together": "openai_compatible",
+    "groq": "openai_compatible",
+    "anthropic": "openai_compatible",
+    "claude": "openai_compatible",
 }
 
 

@@ -22,6 +22,9 @@ from .store import Store, db_path
 log = logging.getLogger("roster.server")
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
+# The React SPA (spec 002) builds here; absent on a fresh clone, where we fall
+# back to the committed single-file dashboard so the UI still works.
+SPA_DIR = STATIC_DIR / "app"
 
 _run: Run | None = None
 _run_lock = asyncio.Lock()
@@ -124,9 +127,17 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Roster Runtime", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+# Serve the built SPA's hashed assets under /app (its `base`). Mounted only when
+# a build is present; otherwise the legacy dashboard is served at / instead.
+if SPA_DIR.is_dir():
+    app.mount("/app", StaticFiles(directory=str(SPA_DIR)), name="app")
+
 
 @app.get("/")
 async def index() -> FileResponse:
+    spa_index = SPA_DIR / "index.html"
+    if spa_index.is_file():
+        return FileResponse(str(spa_index))
     return FileResponse(str(STATIC_DIR / "dashboard.html"))
 
 
@@ -184,7 +195,7 @@ async def chat(payload: dict[str, Any]) -> JSONResponse:
         return JSONResponse({"error": "empty message"}, status_code=400)
     run = await _ensure_run()
     try:
-        reply = await run.handle_principal_message(text)
+        result = await run.handle_principal_message(text)
     except ProviderError as exc:
         await bus.publish("runtime.error", scope="chat", error=str(exc))
         return JSONResponse(
@@ -202,7 +213,13 @@ async def chat(payload: dict[str, Any]) -> JSONResponse:
             },
             status_code=500,
         )
-    return JSONResponse({"reply": reply, "runId": run.run_id})
+    # When the planner pauses to ask the principal, the run stays live (awaiting_input)
+    # and the next /api/chat message is routed as the answer (resumed in the orchestrator).
+    if result.status == "awaiting_input":
+        return JSONResponse(
+            {"status": "awaiting_input", "question": result.text, "runId": run.run_id}
+        )
+    return JSONResponse({"status": "done", "reply": result.text, "runId": run.run_id})
 
 
 @app.post("/api/reset")

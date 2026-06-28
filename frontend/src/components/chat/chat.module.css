@@ -1,0 +1,311 @@
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 20px 0 6px;
+}
+.rail {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.row {
+  display: flex;
+  margin-bottom: 14px;
+}
+.row.user {
+  justify-content: flex-end;
+}
+.row.agent {
+  justify-content: flex-start;
+}
+.wrap {
+  max-width: 86%;
+  display: flex;
+  flex-direction: column;
+}
+.who {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin: 0 4px 4px;
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+.bubbleUser,
+.bubbleAgent {
+  padding: 11px 15px;
+  border-radius: 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  box-shadow: var(--shadow-sm);
+}
+.bubbleUser {
+  max-width: 86%;
+  background: var(--accent);
+  color: var(--on-accent);
+  border-bottom-right-radius: 6px;
+}
+.bubbleAgent {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 6px;
+}
+.error {
+  border-color: var(--err);
+  color: var(--err);
+}
+
+.typing {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+.tdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-3);
+  animation: blink 1.2s infinite both;
+}
+.tdot:nth-child(2) {
+  animation-delay: 0.18s;
+}
+.tdot:nth-child(3) {
+  animation-delay: 0.36s;
+}
+@keyframes blink {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--text-2);
+}
+.glyph {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 10px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 55%, #12b6c6));
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 26px;
+  box-shadow: var(--shadow);
+}
+.empty h2 {
+  font-family: var(--font-d);
+  font-size: 21px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 6px 0 4px;
+  letter-spacing: -0.02em;
+}
+.empty p {
+  margin: 0 auto;
+  max-width: 380px;
+  font-size: 13.5px;
+}
+.suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
+}
+.suggest button {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  cursor: pointer;
+}
+.suggest button:hover {
+  border-color: var(--border-2);
+}
+
+.composer {
+  padding: 8px 0 18px;
+  flex: none;
+}
+.composer .rail {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+.box {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--surface);
+  border: 1.5px solid var(--border-2);
+  border-radius: 22px;
+  padding: 7px 7px 7px 18px;
+  box-shadow: var(--shadow);
+}
+.box:focus-within {
+  border-color: var(--accent);
+}
+.input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.45;
+  resize: none;
+  max-height: 180px;
+  padding: 8px 0;
+  outline: none;
+}
+.input::placeholder {
+  color: var(--text-3);
+}
+.send {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+  font-size: 17px;
+}
+.send:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.hint {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-3);
+  margin-top: 8px;
+}
+
+/* live progress trace (replaces the static typing dots while the planner works) */
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 15px;
+  border-radius: 18px;
+  border-bottom-left-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  max-width: 540px;
+}
+.pstep {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-3);
+}
+.pstep:last-child {
+  color: var(--text);
+  font-weight: 500;
+}
+.perr .ptext {
+  color: var(--err);
+}
+.pdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.ptext {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pspin {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* collapsible per-answer process record (reuses .pstep/.pdot/.ptext/.perr) */
+.trace {
+  margin: 6px 4px 0;
+}
+.traceToggle {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-3);
+  padding: 2px 0;
+}
+.traceToggle:hover {
+  color: var(--text-2);
+}
+.traceBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding-left: 11px;
+  border-left: 2px solid var(--border-2);
+}
+
+/* "awaiting your answer" cue above the composer (US4) */
+.awaitCue {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 8px 14px;
+  border-radius: 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.awaitDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex: none;
+  animation: blink 1.2s ease-in-out infinite;
+}
+.boxAwait {
+  border-color: var(--accent);
+}

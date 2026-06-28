@@ -113,10 +113,16 @@ class AzureFoundryProvider:
         body["model"] = self.cfg.target
         if "temperature" in opts:
             body["temperature"] = opts["temperature"]
-        # Accept either OpenAI-style `max_tokens` or Ollama-style `num_predict`.
-        max_tokens = opts.get("max_tokens", opts.get("num_predict"))
-        if max_tokens is not None:
-            body["max_tokens"] = int(max_tokens)
+        # Support both legacy `max_tokens` and newer `max_completion_tokens`.
+        token_limit = opts.get(
+            "max_completion_tokens",
+            opts.get("max_tokens", opts.get("num_predict")),
+        )
+        if token_limit is not None:
+            if self._is_v1_surface:
+                body["max_completion_tokens"] = int(token_limit)
+            else:
+                body["max_tokens"] = int(token_limit)
         return body
 
     # -- Provider API ---------------------------------------------------------------
@@ -134,7 +140,7 @@ class AzureFoundryProvider:
         try:
             await self.chat(
                 [{"role": "user", "content": "ping"}],
-                options={"max_tokens": 1},
+                options={"max_completion_tokens": 1},
             )
             return {**base, "ok": True}
         except ProviderError as exc:

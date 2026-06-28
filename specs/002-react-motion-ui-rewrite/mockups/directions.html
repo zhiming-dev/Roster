@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Roster — 设计方向（亮/暗双主题）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+
+  /* ===== one identity, two themes ===== */
+  body {
+    --font: 'Plus Jakarta Sans', system-ui, sans-serif;
+    --font-d: 'Space Grotesk', var(--font);
+    --bounce: cubic-bezier(0.34, 1.62, 0.48, 1);
+    --bounce-soft: cubic-bezier(0.33, 1.3, 0.5, 1);
+    font-family: var(--font);
+    color: var(--text);
+    background: var(--page);
+    background-size: 180% 180%;
+    animation: drift 24s ease-in-out infinite;
+    transition: color .4s ease;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100%;
+    padding: 26px 22px 40px;
+  }
+  @keyframes drift { 0%,100% { background-position: 0% 10%; } 50% { background-position: 100% 90%; } }
+
+  body[data-theme="light"] {
+    --page: radial-gradient(1100px 720px at 8% -10%, #FFF1E4, transparent 58%),
+            radial-gradient(900px 640px at 102% 8%, #EFE7FF, transparent 55%),
+            radial-gradient(900px 700px at 60% 120%, #E2F7F4, transparent 55%), #FBF7F1;
+    --surface: #FFFFFF; --surface-2: #F7F2FB; --surface-3: #FBF6F0;
+    --border: rgba(45,30,70,0.10); --border-2: rgba(45,30,70,0.17);
+    --text: #211B2E; --text-2: #6B6478; --text-3: #A9A2B6; --on-accent: #fff;
+    --accent: #7C5CFF; --accent-2: #FF6B5E; --accent-3: #12B6C6;
+    --shadow: 0 14px 30px rgba(86,54,160,0.13), 0 3px 10px rgba(86,54,160,0.07);
+    --shadow-sm: 0 3px 9px rgba(86,54,160,0.12);
+    --ring: rgba(124,92,255,0.20); --dot-glow: 0 0 0;
+    --r-planner:#7C5CFF; --r-researcher:#12B3A6; --r-coder:#2FBF5B; --r-qa:#3B82F6; --r-reviewer:#F5A524; --r-e2e:#FF6B4A; --r-principal:#FF5C8A;
+  }
+  body[data-theme="dark"] {
+    --page: radial-gradient(1100px 760px at 6% -12%, #241a52, transparent 56%),
+            radial-gradient(940px 700px at 104% 4%, #0e2f44, transparent 54%),
+            radial-gradient(900px 760px at 64% 124%, #1a1140, transparent 56%), #0A0B12;
+    --surface: #15182580; --surface-solid: #161927; --surface-2: #1C2031; --surface-3: #12141E;
+    --border: rgba(255,255,255,0.09); --border-2: rgba(255,255,255,0.16);
+    --text: #ECEDF7; --text-2: #9CA1B8; --text-3: #5E627C; --on-accent: #fff;
+    --accent: #9B7BFF; --accent-2: #FF7E6F; --accent-3: #22D3EE;
+    --shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 16px 44px rgba(0,0,0,0.6);
+    --shadow-sm: 0 8px 22px rgba(0,0,0,0.5);
+    --ring: rgba(155,123,255,0.40); --dot-glow: 0 0 11px;
+    --r-planner:#9B7BFF; --r-researcher:#22D3EE; --r-coder:#34E5A8; --r-qa:#4BA8FF; --r-reviewer:#FBBF24; --r-e2e:#FB7185; --r-principal:#F472B6;
+  }
+  body[data-theme="dark"] .surface-solid { background: var(--surface-solid); }
+
+  /* ===== header ===== */
+  .page-head { max-width: 1080px; margin: 0 auto 18px; display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .page-head .ttl { font-family: var(--font-d); font-weight: 700; font-size: 19px; letter-spacing: -0.02em; }
+  .page-head .ttl b { background: linear-gradient(92deg, var(--accent), var(--accent-3)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .page-head .sub { color: var(--text-2); font-size: 13px; font-weight: 500; margin-top: 2px; }
+  .spacer { flex: 1; }
+
+  /* theme toggle */
+  .tt { display: inline-flex; align-items: center; gap: 9px; padding: 6px 8px 6px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 999px; box-shadow: var(--shadow-sm); }
+  .tt span { font-size: 12px; font-weight: 700; color: var(--text-2); }
+  .knob-wrap { width: 60px; height: 30px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); position: relative; cursor: pointer; }
+  .knob { position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent-3)); box-shadow: var(--shadow-sm); display: grid; place-items: center; color: #fff; transition: transform .5s var(--bounce); }
+  body[data-theme="dark"] .knob { transform: translateX(30px); }
+  .knob svg { width: 14px; height: 14px; }
+
+  /* ===== window ===== */
+  .window { max-width: 1080px; margin: 0 auto; background: var(--surface); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); border: 1px solid var(--border); border-radius: 26px; box-shadow: var(--shadow); overflow: hidden; transition: background .45s ease, border-color .4s ease, box-shadow .45s ease; animation: settle .55s var(--bounce); }
+  body[data-theme="dark"] .window { background: rgba(20,22,34,0.72); }
+  @keyframes settle { 0% { transform: scale(.985) translateY(6px); opacity: .3; } 100% { transform: scale(1) translateY(0); opacity: 1; } }
+  .winbar { display: flex; align-items: center; gap: 10px; padding: 13px 16px; border-bottom: 1px solid var(--border); }
+  .lights { display: flex; gap: 7px; } .lights i { width: 11px; height: 11px; border-radius: 50%; display: block; }
+  .lights i:nth-child(1){ background:#FF5F57; } .lights i:nth-child(2){ background:#FEBC2E; } .lights i:nth-child(3){ background:#28C840; }
+  .winbar .url { margin-left: 6px; font-size: 12px; color: var(--text-3); font-weight: 600; }
+  .winbar .badge { margin-left: auto; font-size: 11px; font-weight: 800; color: var(--accent); background: color-mix(in srgb, var(--accent) 15%, transparent); padding: 4px 11px; border-radius: 999px; }
+
+  .grid { display: grid; grid-template-columns: 212px minmax(0,1fr) 252px; height: 568px; }
+
+  /* sidebar */
+  .side { border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 14px 12px; gap: 3px; min-height: 0; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 4px 6px 12px; }
+  .brand .logo { width: 32px; height: 32px; border-radius: 11px; background: linear-gradient(135deg, var(--accent), var(--accent-3)); display: grid; place-items: center; color: #fff; font-weight: 800; font-family: var(--font-d); box-shadow: var(--shadow-sm); animation: bob 3.6s ease-in-out infinite; }
+  @keyframes bob { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-3px) rotate(-3deg); } }
+  .brand b { font-family: var(--font-d); font-size: 16px; font-weight: 700; letter-spacing: -0.02em; }
+  .brand small { display: block; color: var(--text-3); font-size: 10.5px; font-weight: 600; }
+  .newchat { display: flex; align-items: center; justify-content: center; gap: 7px; margin: 2px 4px 10px; padding: 11px; border: none; cursor: pointer; font-family: inherit; font-weight: 800; font-size: 13px; color: var(--on-accent); background: linear-gradient(120deg, var(--accent), color-mix(in srgb, var(--accent) 62%, var(--accent-3))); border-radius: 13px; box-shadow: var(--shadow-sm); transition: transform .3s var(--bounce), filter .2s; }
+  .newchat:hover { transform: translateY(-2px) scale(1.025); filter: brightness(1.05); }
+  .newchat:active { transform: scale(0.94); }
+  .side .lbl { font-size: 10px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--text-3); padding: 8px 8px 4px; }
+  .conv { padding: 9px 11px; border-radius: 12px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--text-2); transition: transform .25s var(--bounce), background .2s, color .2s; }
+  .conv:hover { transform: translateX(3px); background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--text); }
+  .conv.on { background: color-mix(in srgb, var(--accent) 13%, transparent); color: var(--accent); }
+
+  /* main */
+  .main { display: grid; grid-template-rows: auto minmax(0,1fr) auto; min-height: 0; min-width: 0; }
+  .lineage { position: relative; height: 222px; margin: 14px 14px 0; border-radius: 18px; border: 1px solid var(--border); background: var(--surface-2); overflow: hidden; }
+  .lineage .cap { position: absolute; top: 11px; left: 14px; font-size: 10.5px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--text-3); z-index: 3; }
+  .lineage .note { position: absolute; top: 9px; right: 14px; font-size: 11.5px; font-weight: 800; color: var(--accent); opacity: 0; transform: translateY(-5px) scale(.9); transition: opacity .35s, transform .4s var(--bounce); z-index: 3; }
+  .lineage .note.show { opacity: 1; transform: translateY(0) scale(1); }
+  svg.edges { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+  .edge { fill: none; stroke: var(--border-2); stroke-width: 2; }
+  .edge.flow { stroke: var(--accent); stroke-width: 2.6; stroke-dasharray: 5 7; animation: flow .65s linear infinite; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 70%, transparent)); }
+  @keyframes flow { to { stroke-dashoffset: -24; } }
+
+  .node { position: absolute; transform: translate(-50%,-50%); z-index: 2; }
+  .pill { display: flex; align-items: center; gap: 8px; padding: 8px 13px; border-radius: 13px; background: var(--surface-3); border: 1px solid var(--border); box-shadow: var(--shadow-sm); white-space: nowrap; transition: border-color .3s, box-shadow .3s, transform .3s var(--bounce); }
+  body[data-theme="dark"] .pill { background: #1B1E2E; }
+  .node:hover .pill { transform: translateY(-3px) rotate(-1.5deg); }
+  .pill .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--role); box-shadow: var(--dot-glow) var(--role); flex: none; }
+  .pill .nm { font-size: 12.5px; font-weight: 800; letter-spacing: -0.01em; }
+  .pill .role { font-size: 9.5px; font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
+  .node.spec { opacity: 0; }
+  .node.spawn { opacity: 1; } .node.spawn .pill { animation: pop .6s var(--bounce); }
+  @keyframes pop { 0% { transform: scale(.4); } 60% { transform: scale(1.16); } 100% { transform: scale(1); } }
+  .node.busy .pill { border-color: color-mix(in srgb, var(--role) 60%, transparent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--role) 17%, transparent), var(--shadow-sm); animation: breathe 1.5s ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+  .node.busy .dot { animation: dotp 1s ease-in-out infinite; }
+  @keyframes dotp { 0%,100% { transform: scale(1); } 50% { transform: scale(1.55); } }
+  .node .tick { width: 9px; height: 9px; border-radius: 50%; background: var(--r-coder); box-shadow: var(--dot-glow) var(--r-coder); display: none; }
+  .node.done .pill { border-color: color-mix(in srgb, var(--r-coder) 55%, transparent); }
+  .node.done .tick { display: block; } .node.done .dot { display: none; }
+
+  /* chat */
+  .chat { overflow-y: auto; padding: 16px 18px 6px; display: flex; flex-direction: column; gap: 12px; }
+  .chat::-webkit-scrollbar, .body::-webkit-scrollbar { width: 8px; } .chat::-webkit-scrollbar-thumb, .body::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 8px; }
+  .msg { max-width: 80%; animation: bubin .5s var(--bounce) both; }
+  @keyframes bubin { from { transform: translateY(14px) scale(.93); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
+  .msg.me { align-self: flex-end; }
+  .msg .who { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; color: var(--text-2); margin: 0 4px 4px; }
+  .msg .who .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--role, var(--accent)); box-shadow: var(--dot-glow) var(--role, var(--accent)); }
+  .bub { padding: 11px 15px; border-radius: 17px; font-size: 14px; font-weight: 500; line-height: 1.55; white-space: pre-wrap; box-shadow: var(--shadow-sm); }
+  .msg.me .bub { background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 62%, var(--accent-2))); color: var(--on-accent); border-bottom-right-radius: 6px; }
+  .msg.ag .bub { background: var(--surface-3); color: var(--text); border: 1px solid var(--border); border-bottom-left-radius: 6px; }
+  body[data-theme="dark"] .msg.ag .bub { background: #1B1E2E; }
+  .empty { margin: auto; text-align: center; color: var(--text-2); padding: 24px; animation: bubin .6s var(--bounce) both; }
+  .empty .big { width: 56px; height: 56px; margin: 0 auto 6px; border-radius: 17px; background: linear-gradient(135deg, var(--accent), var(--accent-3)); display: grid; place-items: center; color: #fff; box-shadow: var(--shadow); animation: bob 3.6s ease-in-out infinite; }
+  .empty h3 { font-family: var(--font-d); font-size: 19px; font-weight: 700; color: var(--text); margin: 10px 0 4px; letter-spacing: -0.02em; }
+  .empty p { font-size: 13px; margin: 0; font-weight: 500; }
+
+  /* composer */
+  .composer { padding: 10px 18px 18px; }
+  .cbox { display: flex; align-items: center; gap: 8px; padding: 7px 7px 7px 16px; border: 1.5px solid var(--border-2); border-radius: 18px; background: var(--surface-3); transition: border-color .25s, box-shadow .25s; }
+  body[data-theme="dark"] .cbox { background: #1B1E2E; }
+  .cbox:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--ring); }
+  .cbox input { flex: 1; border: none; outline: none; background: transparent; font-family: inherit; font-size: 14px; font-weight: 500; color: var(--text); }
+  .cbox input::placeholder { color: var(--text-3); }
+  .run { border: none; cursor: pointer; font-family: inherit; font-weight: 800; font-size: 12.5px; color: var(--on-accent); background: linear-gradient(120deg, var(--accent), var(--accent-3)); padding: 10px 17px; border-radius: 13px; box-shadow: var(--shadow-sm); transition: transform .3s var(--bounce), filter .2s; white-space: nowrap; }
+  .run:hover { transform: translateY(-2px) scale(1.04); filter: brightness(1.06); }
+  .run:active { transform: scale(0.93); }
+
+  /* activity */
+  .act { border-left: 1px solid var(--border); display: flex; flex-direction: column; min-height: 0; }
+  .act h4 { margin: 0; padding: 15px 15px 11px; font-family: var(--font-d); font-size: 13px; font-weight: 700; letter-spacing: -0.01em; border-bottom: 1px solid var(--border); }
+  .act .body { flex: 1; overflow-y: auto; padding: 11px; display: flex; flex-direction: column; gap: 8px; }
+  .evt { border: 1px solid var(--border); border-radius: 12px; background: var(--surface-3); padding: 8px 10px; animation: bubin .45s var(--bounce) both; }
+  body[data-theme="dark"] .evt { background: #1A1D2C; }
+  .evt .top { display: flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; }
+  .evt .from { color: var(--text); } .evt .arr { color: var(--text-3); }
+  .evt .k { margin-left: auto; font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; padding: 2px 7px; border-radius: 7px; background: color-mix(in srgb, var(--kc, var(--accent)) 17%, transparent); color: var(--kc, var(--accent)); }
+  .evt .txt { font-size: 11.5px; color: var(--text-2); margin-top: 5px; line-height: 1.45; font-weight: 500; }
+  .act .none { color: var(--text-3); font-size: 12px; text-align: center; padding: 28px 12px; font-weight: 600; line-height: 1.6; }
+
+  .foot { max-width: 1080px; margin: 16px auto 0; color: var(--text-3); font-size: 12px; font-weight: 600; text-align: center; }
+  @media (max-width: 980px) { .grid { grid-template-columns: 0 minmax(0,1fr) 0; } .side,.act { display: none; } }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
+</style>
+</head>
+<body data-theme="light">
+  <div class="page-head">
+    <div>
+      <div class="ttl">Roster · <b>一套设计，亮 / 暗双主题</b></div>
+      <div class="sub">暖亮主题 = 亲和糖果感 · 暗色主题 = 电光发光 · 统一的 spring「Q弹」动效</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="tt">
+      <span id="ttlabel">Light</span>
+      <div class="knob-wrap" id="toggle">
+        <div class="knob" id="knob">
+          <svg id="ticon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v1M12 20v1M4.2 4.2l.7.7M19.1 19.1l.7.7M3 12h1M20 12h1M4.2 19.8l.7-.7M19.1 4.9l.7-.7"/></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="window" id="win">
+    <div class="winbar">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="url">localhost:8765</div>
+      <div class="badge">灵动 / Q弹</div>
+    </div>
+    <div class="grid">
+      <aside class="side">
+        <div class="brand"><div class="logo">R</div><div><b>Roster</b><small>multi-agent</small></div></div>
+        <button class="newchat">＋ 新建对话</button>
+        <div class="lbl">历史</div>
+        <div class="conv on">NASDAQ 走势报告</div>
+        <div class="conv">/health 端点 + E2E</div>
+        <div class="conv">审查 feature 分支</div>
+      </aside>
+
+      <section class="main">
+        <div class="lineage" id="lineage">
+          <span class="cap">Agent lineage</span>
+          <span class="note" id="note">拆解 → 10 / 30 / 200 日</span>
+          <svg class="edges" id="edges" viewBox="0 0 560 222" preserveAspectRatio="none"></svg>
+          <div id="nodes"></div>
+        </div>
+        <div class="chat" id="chat">
+          <div class="empty" id="empty">
+            <div class="big"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.2 5.5L20 11l-5.8 2.5L12 19l-2.2-5.5L4 11l5.8-2.5z"/></svg></div>
+            <h3>让团队来分析</h3>
+            <p>对 Planner 说话，它会拆解目标并分派给专精的 subagent。</p>
+          </div>
+        </div>
+        <div class="composer">
+          <div class="cbox">
+            <input id="inp" placeholder="对 Planner 说…（例：分析今天 NASDAQ 的走势）" />
+            <button class="run" id="runbtn">▶ 跑一个任务</button>
+          </div>
+        </div>
+      </section>
+
+      <aside class="act">
+        <h4>Inter-agent 活动</h4>
+        <div class="body" id="actbody"><div class="none">还没有 agent 通信。<br>派发、结果、搜索会出现在这里。</div></div>
+      </aside>
+    </div>
+  </div>
+
+  <p class="foot">右上角切换 <b>亮 / 暗</b> · 点 <b>▶ 跑一个任务</b> 看 Q 弹动效 · 真实实现用 motion.dev 的 spring（这里用 CSS 弹性曲线模拟）</p>
+
+<script>
+const NODES = {
+  you:     { x: 52,  y: 111, role: "principal",  nm: "你",         roleName: "principal" },
+  planner: { x: 178, y: 111, role: "planner",    nm: "Planner",    roleName: "CEO" },
+  r10:     { x: 372, y: 48,  role: "researcher", nm: "Researcher", roleName: "10 日" },
+  r30:     { x: 404, y: 111, role: "researcher", nm: "Researcher", roleName: "30 日" },
+  r200:    { x: 372, y: 174, role: "researcher", nm: "Researcher", roleName: "200 日" },
+};
+const EDGES = [["you","planner"],["planner","r10"],["planner","r30"],["planner","r200"]];
+const nodesHost = document.getElementById("nodes"), edgesSvg = document.getElementById("edges");
+const nodeEl = {}, edgeEl = {};
+function buildGraph() {
+  nodesHost.innerHTML = ""; edgesSvg.innerHTML = "";
+  for (const [a,b] of EDGES) {
+    const pa = NODES[a], pb = NODES[b], dx = Math.max(36, Math.abs(pb.x-pa.x)*0.45);
+    const p = document.createElementNS("http://www.w3.org/2000/svg","path");
+    p.setAttribute("d", `M ${pa.x} ${pa.y} C ${pa.x+dx} ${pa.y}, ${pb.x-dx} ${pb.y}, ${pb.x} ${pb.y}`);
+    p.setAttribute("class","edge"); edgesSvg.appendChild(p); edgeEl[a+">"+b] = p;
+  }
+  for (const [k,n] of Object.entries(NODES)) {
+    const el = document.createElement("div");
+    el.className = "node" + (k.startsWith("r") ? " spec" : "");
+    el.style.left = n.x+"px"; el.style.top = n.y+"px"; el.style.setProperty("--role","var(--r-"+n.role+")");
+    el.innerHTML = `<div class="pill"><span class="dot"></span><span class="tick"></span><span class="nm">${n.nm}</span><span class="role">${n.roleName}</span></div>`;
+    nodesHost.appendChild(el); nodeEl[k] = el;
+  }
+}
+buildGraph();
+
+const sleep = (ms)=>new Promise(r=>setTimeout(r,ms));
+const chat=document.getElementById("chat"), empty=document.getElementById("empty"),
+      actbody=document.getElementById("actbody"), note=document.getElementById("note");
+function addMsg(side, who, role, text) {
+  if (empty && empty.parentNode) empty.remove();
+  const m=document.createElement("div"); m.className="msg "+side;
+  m.innerHTML=(side==="ag"?`<div class="who"><span class="dot" style="background:var(--r-${role})"></span>${who}</div>`:"")+`<div class="bub"></div>`;
+  m.querySelector(".bub").textContent=text; chat.appendChild(m); chat.scrollTop=chat.scrollHeight;
+}
+function addEvt(from,to,kind,kc,txt) {
+  const none=actbody.querySelector(".none"); if(none) none.remove();
+  const e=document.createElement("div"); e.className="evt"; e.style.setProperty("--kc","var(--r-"+kc+")");
+  e.innerHTML=`<div class="top"><span class="from">${from}</span>${to?`<span class="arr">→</span><span class="from">${to}</span>`:""}<span class="k">${kind}</span></div><div class="txt">${txt}</div>`;
+  actbody.appendChild(e); actbody.scrollTop=actbody.scrollHeight;
+}
+const busy=(k,on)=>nodeEl[k].classList.toggle("busy",on);
+const done=(k)=>{nodeEl[k].classList.remove("busy");nodeEl[k].classList.add("done");};
+const flow=(a,b,on)=>{const e=edgeEl[a+">"+b]; if(e) e.classList.toggle("flow",on);};
+function reset(){ chat.innerHTML=""; chat.appendChild(empty);
+  actbody.innerHTML='<div class="none">还没有 agent 通信。<br>派发、结果、搜索会出现在这里。</div>';
+  note.classList.remove("show"); buildGraph(); }
+
+let running=false;
+async function runDemo(){
+  if(running) return; running=true; reset();
+  addMsg("me","","","分析今天 NASDAQ 的走势，生成 10 日 / 30 日 / 200 日 report");
+  await sleep(450); busy("planner",true); flow("you","planner",true);
+  await sleep(720); note.classList.add("show");
+  addEvt("planner","","thinking","planner","分析需求 → 拆成 3 个时间窗的研究子任务，并行派发");
+  flow("you","planner",false); await sleep(480);
+  const specs=["r10","r30","r200"], wins=["10 日","30 日","200 日"];
+  for(let i=0;i<specs.length;i++){ const k=specs[i];
+    nodeEl[k].classList.add("spawn"); flow("planner",k,true); busy(k,true);
+    addEvt("planner","researcher","dispatch","planner",`研究 NASDAQ ${wins[i]}走势 + 驱动因素`);
+    await sleep(300);
+  }
+  busy("planner",false); await sleep(1150);
+  for(let i=0;i<specs.length;i++){ flow("planner",specs[i],false); done(specs[i]); }
+  addEvt("researcher","planner","result","researcher","3 份带来源的结果返回（各时间窗收盘 / 涨跌 / 驱动）");
+  await sleep(380); addEvt("planner","qa","verify","qa","数字交叉核对一致 ✓ — 通过");
+  busy("planner",true); await sleep(780); busy("planner",false);
+  addMsg("ag","Planner","planner","已综合三个时间窗：\n• 10 日：震荡走高，科技股领涨\n• 30 日：温和上行，受财报与降息预期推动\n• 200 日：长期上行趋势完好，回撤多被买回\n\n（含来源链接 · 已经 QA 核对）");
+  running=false;
+}
+document.getElementById("runbtn").addEventListener("click",runDemo);
+document.getElementById("inp").addEventListener("keydown",(e)=>{ if(e.key==="Enter") runDemo(); });
+
+// theme toggle
+const moon='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>';
+const sun='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v1M12 20v1M4.2 4.2l.7.7M19.1 19.1l.7.7M3 12h1M20 12h1M4.2 19.8l.7-.7M19.1 4.9l.7-.7"/></svg>';
+document.getElementById("toggle").addEventListener("click",()=>{
+  const dark=document.body.getAttribute("data-theme")==="dark";
+  const next=dark?"light":"dark"; document.body.setAttribute("data-theme",next);
+  document.getElementById("ttlabel").textContent=dark?"Light":"Dark";
+  document.getElementById("ticon").outerHTML=(dark?sun:moon).replace("<svg",'<svg id="ticon"');
+  const win=document.getElementById("win"); win.style.animation="none"; void win.offsetWidth; win.style.animation="settle .55s var(--bounce)";
+});
+</script>
+</body>
+</html>

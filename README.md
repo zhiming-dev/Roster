@@ -196,3 +196,5 @@ small businesses.
 
 Issues and PRs welcome. Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) and the architecture sections
 of [`conclave-spec.md`](./conclave-spec.md) before submitting.
+
+这样说吧！我的终极目标是一个“团队协作类型的” 带可解释性UI的OpenClaw/Hermes类的app。你说的没错，现在的机制是一次性转发，我的确想让Planner聪明一点，会进行分析需求，然后将各个不同种类的任务分配下去给专精的subagent，我们可以看情况给不同的subagent 分配不同的LLM API（比如说负责duckduckgo搜索的可能grok-mini都够了，但是负责思考的统领Planner就得需要Opus）。有一个我很想做的P0功能是实现subagent之间的讨论：planner有独立思考的能力，看到subagent发回来的东西可能有问题的时候，再返回给用户之前，先反问subagent（可以是调用别的subagent，或者是当前回答的那个subagent）。planner的任务是“理解并完成用户的提问/任务，有必要时在对话进行一半的时候向用户提问，然后继续任务（而不是结束当前任务）”， planner不直接参与执行（类似于CEO，不直接写代码），非必要时，执行完全交给subagent。这样我们能形成一个很聪明的系统

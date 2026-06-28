@@ -51,6 +51,10 @@ defaults:
 # thrash. Agents listed in `require_queue` are serialized through the queue and
 # admit at most `max_concurrency` at a time; their wait shows up on the
 # dashboard as the `queued` status. Agents NOT listed call the model directly.
+#
+# The Planner fans out independent sub-tasks IN PARALLEL (spec 001); that parallelism is
+# bounded by `max_concurrency`. Keep it at 1 if every agent shares one small local model;
+# raise it to 2–4 when agents use separate or cloud backends so fan-out runs concurrently.
 queue:
   max_concurrency: 1
   require_queue:
@@ -90,6 +94,16 @@ agents:
     # api_key: ${AZURE_FOUNDRY_API_KEY}  # read from env — never a literal key
     # # api_version: "2024-05-01-preview"  # omit for the /openai/v1 surface (versionless)
     # options: { temperature: 0.2, max_tokens: 800 }
+    # --- Option: OpenAI-compatible (xAI/grok, OpenAI, DeepSeek, Anthropic-compat) ------
+    #   Give the *planner* a capable model — it does the reasoning and decomposition.
+    #   Cheap agents (e.g. the researcher) can point at a small model; each agent may use
+    #   a different provider entirely.
+    # provider: openai_compatible
+    # endpoint: https://api.x.ai/v1            # base URL; /chat/completions is appended
+    # model: grok-2-latest                     # the backend's model id
+    # api_key: ${XAI_API_KEY}                  # Bearer key — never a literal key
+    # options: { temperature: 0.2, max_tokens: 1500 }
+    # system_prompt_max_chars: null            # a capable model should see the FULL prompt
 
   coder:
     agent_file: ../coder-agent/coder.agent.md
@@ -121,3 +135,8 @@ agents:
     role: researcher
     tools: [search]
     options: { temperature: 0.2, num_predict: 1000 }
+    # A cheap model is plenty for search + summarize, e.g. a small OpenAI-compatible one:
+    # provider: openai_compatible
+    # endpoint: https://api.x.ai/v1
+    # model: grok-2-mini
+    # api_key: ${XAI_API_KEY}
