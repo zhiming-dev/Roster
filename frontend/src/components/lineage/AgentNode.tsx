@@ -9,7 +9,11 @@ export function AgentNode({ node, x, y }: { node: LineageNode; x: number; y: num
     node.status === "thinking" || node.status === "searching" || node.status === "queued";
   // Motion owns the full transform (including the -50% centering) so it can spring
   // the scale without fighting a CSS translate.
-  const style = { left: x, top: y, "--role": `var(--r-${node.role})` } as CSSProperties;
+  const style = {
+    left: x,
+    top: y,
+    "--role": node.color ?? `var(--r-${node.role})`,
+  } as CSSProperties;
   return (
     <motion.div
       className={`${styles.node} ${node.you ? styles.you : ""}`}
@@ -24,6 +28,7 @@ export function AgentNode({ node, x, y }: { node: LineageNode; x: number; y: num
       }
     >
       <div className={styles.bubble}>
+        <span className={styles.avatar}>{node.emoji}</span>
         <span className={styles.dot} />
         <span className={styles.nm}>{node.name}</span>
       </div>

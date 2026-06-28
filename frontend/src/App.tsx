@@ -5,6 +5,7 @@ import { ActivityPanel } from "./components/activity/ActivityPanel";
 import { ChatView } from "./components/chat/ChatView";
 import { Composer } from "./components/chat/Composer";
 import { LineageGraph } from "./components/lineage/LineageGraph";
+import { SetupView } from "./components/setup/SetupView";
 import { Sidebar } from "./components/Sidebar";
 import { loadInitial } from "./store/actions";
 import { handleEvent } from "./store/handleEvent";
@@ -24,6 +25,7 @@ export function App() {
   const unread = useStore((s) => s.unread);
   const clearUnread = useStore((s) => s.clearUnread);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [view, setView] = useState<"chat" | "setup">("chat");
 
   useWebSocket({ onEvent: (e) => handleEvent(e, true), onConnection: setConnection });
 
@@ -60,19 +62,33 @@ export function App() {
         )}
 
         <div className="workspace-top">
-          <span className="spacer" />
           <button
-            className={`activity-toggle ${activityOpen ? "on" : ""}`}
-            onClick={toggleActivity}
+            className={`activity-toggle ${view === "setup" ? "on" : ""}`}
+            onClick={() => setView((v) => (v === "setup" ? "chat" : "setup"))}
           >
-            Activity
-            {unread > 0 && !activityOpen && <span className="badge">{unread}</span>}
+            ⚙ Setup
           </button>
+          <span className="spacer" />
+          {view === "chat" && (
+            <button
+              className={`activity-toggle ${activityOpen ? "on" : ""}`}
+              onClick={toggleActivity}
+            >
+              Activity
+              {unread > 0 && !activityOpen && <span className="badge">{unread}</span>}
+            </button>
+          )}
         </div>
 
-        <LineageGraph />
-        <ChatView />
-        <Composer />
+        {view === "setup" ? (
+          <SetupView onClose={() => setView("chat")} />
+        ) : (
+          <>
+            <LineageGraph />
+            <ChatView />
+            <Composer />
+          </>
+        )}
       </main>
 
       <ActivityPanel onClose={() => setActivityOpen(false)} />

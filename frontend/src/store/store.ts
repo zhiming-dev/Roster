@@ -151,7 +151,7 @@ export function deriveLineage(agents: Record<string, AgentInfo>): {
   for (const n of present) if (!ordered.includes(n)) ordered.push(n);
 
   const nodes: LineageNode[] = [
-    { key: "you", name: "You", role: "principal", status: "idle", you: true },
+    { key: "you", name: "You", role: "principal", status: "idle", you: true, emoji: "🧑", color: null },
     ...ordered.map((name): LineageNode => {
       const a = agents[name];
       return {
@@ -159,6 +159,8 @@ export function deriveLineage(agents: Record<string, AgentInfo>): {
         name,
         role: a?.role ?? name,
         status: (a?.status ?? "idle") as AgentStatusValue,
+        emoji: a?.emoji || "🤖",
+        color: a?.color ?? null,
       };
     }),
   ];

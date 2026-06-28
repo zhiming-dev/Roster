@@ -24,6 +24,23 @@ import yaml
 
 log = logging.getLogger("roster.config")
 
+# Default avatar per role (overridable via `emoji:` in an agent's .agent.md frontmatter).
+ROLE_EMOJI = {
+    "planner": "🧭",
+    "coder": "💻",
+    "e2e": "🌐",
+    "reviewer": "🔍",
+    "qa": "✅",
+    "researcher": "🔬",
+    "principal": "🧑",
+    "ops": "🛠️",
+    "data": "📊",
+}
+
+
+def default_emoji(role: str) -> str:
+    return ROLE_EMOJI.get(role, "🤖")
+
 # ${VAR} or ${VAR:-default}
 _ENV_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-(.*?))?\}")
 
@@ -126,6 +143,8 @@ class AgentConfig:
     provider: ProviderConfig
     system_prompt_max_chars: int | None = None
     tools: list[str] = field(default_factory=list)  # e.g. ["search"]
+    emoji: str = "🤖"  # avatar (from .agent.md `emoji:` or the role default)
+    color: str | None = None  # custom hex; None → use the role's theme color
 
 
 @dataclass
@@ -212,8 +231,27 @@ def _build_provider(name: str, merged: dict[str, Any]) -> ProviderConfig:
     return cfg
 
 
+def _load_dotenv(base_dir: Path) -> None:
+    """Load ``<base_dir>/.env`` into the process env so ``${VAR}`` references resolve.
+
+    Shell env wins (``setdefault``); the Setup config API also writes live key updates
+    straight into ``os.environ``, so the UI-managed secret store takes effect without a
+    process restart. The ``.env`` file is gitignored.
+    """
+    env_file = base_dir / ".env"
+    if not env_file.is_file():
+        return
+    for line in env_file.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip())
+
+
 def load_config(config_path: str | Path) -> RuntimeConfig:
     config_path = Path(config_path).resolve()
+    _load_dotenv(config_path.parent)
     raw = _expand_env(yaml.safe_load(config_path.read_text(encoding="utf-8")) or {})
     defaults = raw.get("defaults", {}) or {}
     base_dir = config_path.parent
@@ -246,16 +284,20 @@ def load_config(config_path: str | Path) -> RuntimeConfig:
             body = body[: int(cap)].rstrip() + "\n\n... [trimmed for runtime] ...\n"
 
         tools = [str(t).lower() for t in (merged.get("tools") or [])]
+        role = merged.get("role", name)
+        color = frontmatter.get("color")
 
         agents[name] = AgentConfig(
             name=name,
-            role=merged.get("role", name),
+            role=role,
             agent_file=agent_file,
             description=str(frontmatter.get("description", "")),
             system_prompt=body,
             provider=_build_provider(name, merged),
             system_prompt_max_chars=int(cap) if cap is not None else None,
             tools=tools,
+            emoji=str(frontmatter.get("emoji") or default_emoji(role)),
+            color=str(color) if color else None,
         )
 
     # Validate queue membership references real agents.

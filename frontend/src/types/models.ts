@@ -36,6 +36,8 @@ export interface AgentInfo {
   endpoint: string;
   model: string;
   auth: string;
+  emoji: string;
+  color: string | null;
 }
 
 // One row from GET /api/conversations (store._list_conversations).
@@ -80,6 +82,8 @@ export interface LineageNode {
   name: string;
   role: string;
   status: AgentStatusValue;
+  emoji: string;
+  color: string | null; // custom hex, or null → role theme color
   you?: boolean;
 }
 

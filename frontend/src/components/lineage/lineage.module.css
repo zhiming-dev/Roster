@@ -65,9 +65,14 @@
 .you .bubble {
   background: color-mix(in srgb, var(--role) 12%, var(--surface));
 }
+.avatar {
+  font-size: 15px;
+  line-height: 1;
+  flex: none;
+}
 .dot {
-  width: 9px;
-  height: 9px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--role);
   flex: none;

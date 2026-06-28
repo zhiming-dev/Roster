@@ -21,6 +21,7 @@ const enter = {
 
 function MessageBubble({ m }: { m: ChatMessage }) {
   const [open, setOpen] = useState(false);
+  const emoji = useStore((s) => s.agents[m.author]?.emoji);
   if (m.side === "user") {
     return (
       <motion.div className={`${styles.row} ${styles.user}`} {...enter}>
@@ -33,7 +34,7 @@ function MessageBubble({ m }: { m: ChatMessage }) {
     <motion.div className={`${styles.row} ${styles.agent}`} {...enter}>
       <div className={styles.wrap}>
         <div className={styles.who}>
-          <span className={styles.dot} style={{ background: `var(--r-${m.role})` }} />
+          <span className={styles.avatar}>{emoji ?? "🤖"}</span>
           {m.author}
         </div>
         <div className={`${styles.bubbleAgent} ${m.error ? styles.error : ""}`}>{m.content}</div>

@@ -39,6 +39,10 @@
   height: 7px;
   border-radius: 50%;
 }
+.avatar {
+  font-size: 14px;
+  line-height: 1;
+}
 .bubbleUser,
 .bubbleAgent {
   padding: 11px 15px;

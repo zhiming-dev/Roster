@@ -14,6 +14,7 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from . import config_api
 from .bus import bus
 from .orchestrator import Run
 from .providers import ProviderError
@@ -175,6 +176,8 @@ async def agents() -> JSONResponse:
                     "queue_waiting": a.queue_waiting,
                     "search": a.search_enabled,
                     "tools": a.cfg.tools,
+                    "emoji": a.cfg.emoji,
+                    "color": a.cfg.color,
                     "description": a.cfg.description,
                     "system_prompt_chars": len(a.history[0]["content"])
                     if a.history and a.history[0].get("role") == "system"
@@ -293,6 +296,62 @@ async def delete_conversation(conv_id: str) -> JSONResponse:
     if active:
         await _ensure_run()
     return JSONResponse({"ok": True, "active": _run.run_id if _run is not None else None})
+
+
+# ---- Team configuration (spec 003) ------------------------------------------------
+# File-based: edits agents.config.yaml + each agent's .agent.md, with secrets in .env.
+# Changes apply to NEW chats — the client calls /api/reset to rebuild the run.
+
+
+@app.get("/api/config")
+async def get_config() -> JSONResponse:
+    return JSONResponse(config_api.editable_config())
+
+
+@app.put("/api/config/agents/{name}")
+async def put_agent(name: str, patch: dict[str, Any]) -> JSONResponse:
+    try:
+        config_api.update_agent(name, patch)
+    except KeyError:
+        return JSONResponse({"error": f"unknown agent '{name}'"}, status_code=404)
+    except Exception as exc:  # noqa: BLE001 - surface the message to the UI
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/config/agents")
+async def post_agent(spec: dict[str, Any]) -> JSONResponse:
+    try:
+        config_api.add_agent(spec)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return JSONResponse({"ok": True})
+
+
+@app.delete("/api/config/agents/{name}")
+async def delete_agent_config(name: str) -> JSONResponse:
+    try:
+        config_api.delete_agent(name)
+    except KeyError:
+        return JSONResponse({"error": f"unknown agent '{name}'"}, status_code=404)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return JSONResponse({"ok": True})
+
+
+@app.put("/api/config/search")
+async def put_search(patch: dict[str, Any]) -> JSONResponse:
+    try:
+        config_api.update_search(patch)
+    except Exception as exc:  # noqa: BLE001
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return JSONResponse({"ok": True})
+
+
+@app.post("/api/config/migrate-keys")
+async def migrate_keys() -> JSONResponse:
+    moved = config_api.migrate_inline_keys()
+    return JSONResponse({"ok": True, "moved": moved})
 
 
 @app.websocket("/ws")
