@@ -5,6 +5,7 @@ export interface AgentCfg {
   role: string;
   emoji: string;
   color: string | null;
+  skills: string[];
   persona: string;
   provider: string | null;
   endpoint: string | null;
@@ -27,7 +28,12 @@ export interface SearchCfg {
 export interface TeamConfig {
   agents: AgentCfg[];
   search: SearchCfg;
-  available: { providers: string[]; tools: string[]; search_providers: string[] };
+  available: {
+    providers: string[];
+    tools: string[];
+    search_providers: string[];
+    skills: { name: string; summary: string; roles: string[] }[];
+  };
   inline_keys: number;
 }
 

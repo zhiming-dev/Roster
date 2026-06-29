@@ -15,11 +15,19 @@ from typing import Any
 
 import yaml
 
-from .config import default_emoji
+from .config import default_emoji, skills_registry
 
 _PROVIDERS = ["ollama", "azure_foundry", "openai_compatible"]
 _TOOLS = ["search"]
 _SEARCH_PROVIDERS = ["auto", "duckduckgo", "tavily", "none"]
+
+
+def _available_skills() -> list[dict[str, Any]]:
+    reg = skills_registry(config_path().parent)
+    return [
+        {"name": n, "summary": e.get("summary", ""), "roles": e.get("applies_to_roles", [])}
+        for n, e in reg.items()
+    ]
 
 
 def config_path() -> Path:
@@ -119,6 +127,7 @@ def editable_config() -> dict[str, Any]:
                 "persona": body,
                 "emoji": fm.get("emoji") or default_emoji(role),
                 "color": fm.get("color"),
+                "skills": fm.get("skills") or [],
                 "provider": merged.get("provider"),
                 "endpoint": merged.get("endpoint"),
                 "model": merged.get("model"),
@@ -147,6 +156,7 @@ def editable_config() -> dict[str, Any]:
             "providers": _PROVIDERS,
             "tools": _TOOLS,
             "search_providers": _SEARCH_PROVIDERS,
+            "skills": _available_skills(),
         },
         "inline_keys": _count_inline_keys(raw),
     }
@@ -171,7 +181,7 @@ def update_agent(name: str, patch: dict[str, Any]) -> None:
     base = config_path().parent
 
     pp = _persona_path(base, agent)
-    if pp and ("persona" in patch or "emoji" in patch or "color" in patch):
+    if pp and any(k in patch for k in ("persona", "emoji", "color", "skills")):
         fm, body = read_md(pp)
         if patch.get("persona") is not None:
             body = str(patch["persona"])
@@ -185,6 +195,8 @@ def update_agent(name: str, patch: dict[str, Any]) -> None:
                 fm["color"] = patch["color"]
             else:
                 fm.pop("color", None)
+        if "skills" in patch:
+            fm["skills"] = [str(s) for s in (patch["skills"] or [])]
         write_md(pp, fm, body)
 
     for field in ("role", "provider", "endpoint", "model", "auth", "system_prompt_max_chars"):
@@ -226,6 +238,8 @@ def add_agent(spec: dict[str, Any]) -> None:
         fm["emoji"] = spec["emoji"]
     if spec.get("color"):
         fm["color"] = spec["color"]
+    if spec.get("skills"):
+        fm["skills"] = [str(s) for s in spec["skills"]]
     write_md(md_path, fm, persona)
 
     agent: dict[str, Any] = {"agent_file": os.path.relpath(md_path, base), "role": role}

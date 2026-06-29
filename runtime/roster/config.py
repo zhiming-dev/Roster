@@ -41,6 +41,55 @@ ROLE_EMOJI = {
 def default_emoji(role: str) -> str:
     return ROLE_EMOJI.get(role, "🤖")
 
+
+def skills_registry(base_dir: Path) -> dict[str, dict[str, Any]]:
+    """Load ``shared/skills.registry.yaml`` → ``{name: {path, summary, applies_to_roles}}``.
+
+    Skills are markdown *procedures* (SKILL.md). "Executing" a skill in this runtime means
+    injecting its content into a granting agent's system prompt — see ``_compose_skills_prompt``.
+    """
+    reg_path = base_dir.parent / "shared" / "skills.registry.yaml"
+    out: dict[str, dict[str, Any]] = {}
+    if not reg_path.is_file():
+        return out
+    data = yaml.safe_load(reg_path.read_text(encoding="utf-8")) or {}
+    for s in data.get("skills", []) or []:
+        name = s.get("name")
+        if name:
+            out[str(name)] = {
+                "path": s.get("path", ""),
+                "summary": s.get("summary", ""),
+                "applies_to_roles": s.get("applies_to_roles", []),
+            }
+    return out
+
+
+def _skill_body(base_dir: Path, rel_path: str, cap: int = 2500) -> str:
+    if not rel_path:
+        return ""
+    p = (base_dir.parent / rel_path).resolve()
+    if not p.is_file():
+        return ""
+    text = p.read_text(encoding="utf-8")
+    if text.startswith("---"):
+        parts = text.split("---", 2)
+        if len(parts) >= 3:
+            text = parts[2].lstrip("\n")
+    return text[:cap].rstrip()
+
+
+def _compose_skills_prompt(
+    base_dir: Path, reg: dict[str, dict[str, Any]], names: list[str]
+) -> str:
+    blocks: list[str] = []
+    for n in names:
+        entry = reg.get(n)
+        if not entry:
+            continue
+        body = _skill_body(base_dir, str(entry.get("path", "")))
+        blocks.append(f"### {n}\n{body or entry.get('summary', '')}")
+    return "\n\n".join(blocks)
+
 # ${VAR} or ${VAR:-default}
 _ENV_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-(.*?))?\}")
 
@@ -145,6 +194,8 @@ class AgentConfig:
     tools: list[str] = field(default_factory=list)  # e.g. ["search"]
     emoji: str = "🤖"  # avatar (from .agent.md `emoji:` or the role default)
     color: str | None = None  # custom hex; None → use the role's theme color
+    skills: list[str] = field(default_factory=list)  # granted skill names
+    skills_prompt: str = ""  # composed skill bodies, injected into the system prompt
 
 
 @dataclass
@@ -255,6 +306,7 @@ def load_config(config_path: str | Path) -> RuntimeConfig:
     raw = _expand_env(yaml.safe_load(config_path.read_text(encoding="utf-8")) or {})
     defaults = raw.get("defaults", {}) or {}
     base_dir = config_path.parent
+    _skill_reg = skills_registry(base_dir)
 
     q = raw.get("queue", {}) or {}
     queue = QueueConfig(
@@ -286,6 +338,7 @@ def load_config(config_path: str | Path) -> RuntimeConfig:
         tools = [str(t).lower() for t in (merged.get("tools") or [])]
         role = merged.get("role", name)
         color = frontmatter.get("color")
+        skills = [str(sk) for sk in (frontmatter.get("skills") or [])]
 
         agents[name] = AgentConfig(
             name=name,
@@ -298,6 +351,8 @@ def load_config(config_path: str | Path) -> RuntimeConfig:
             tools=tools,
             emoji=str(frontmatter.get("emoji") or default_emoji(role)),
             color=str(color) if color else None,
+            skills=skills,
+            skills_prompt=_compose_skills_prompt(base_dir, _skill_reg, skills),
         )
 
     # Validate queue membership references real agents.

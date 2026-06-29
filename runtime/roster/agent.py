@@ -50,6 +50,8 @@ class Agent:
         search_max_results: int = 5,
     ) -> "Agent":
         system = cfg.system_prompt
+        if cfg.skills_prompt:
+            system = system + "\n\n---\n\n## Skills you have\n\n" + cfg.skills_prompt
         if runtime_suffix:
             system = system + "\n\n---\n\n" + runtime_suffix
         return cls(

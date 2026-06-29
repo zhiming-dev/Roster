@@ -82,6 +82,9 @@ function AgentEditor({
   const [search, setSearch] = useState(agent?.tools.includes("search") ?? false);
   const [emoji, setEmoji] = useState(agent?.emoji ?? "");
   const [color, setColor] = useState(agent?.color ?? "");
+  const [skills, setSkills] = useState<string[]>(agent?.skills ?? []);
+  const toggleSkill = (n: string) =>
+    setSkills((cur) => (cur.includes(n) ? cur.filter((x) => x !== n) : [...cur, n]));
   const [apiKey, setApiKey] = useState("");
   const [err, setErr] = useState("");
 
@@ -90,7 +93,7 @@ function AgentEditor({
       const tools = search ? ["search"] : [];
       const options = { temperature: Number(temperature), max_tokens: Number(maxTokens) };
       const key = apiKey ? { api_key: apiKey } : {};
-      const ident = { emoji, color };
+      const ident = { emoji, color, skills };
       if (agent === null) {
         await configApi.addAgent({ name, role: role || name, persona, provider, endpoint, model, tools, options, ...ident, ...key });
       } else {
@@ -165,6 +168,23 @@ function AgentEditor({
             }
           />
         </Field>
+        {available.skills.length > 0 && (
+          <div className={styles.field}>
+            <span>Skills (each grants its procedure into this agent's prompt)</span>
+            <div className={styles.skills}>
+              {available.skills.map((sk) => (
+                <label key={sk.name} className={styles.skill} title={sk.summary}>
+                  <input
+                    type="checkbox"
+                    checked={skills.includes(sk.name)}
+                    onChange={() => toggleSkill(sk.name)}
+                  />
+                  {sk.name}
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
         <label className={styles.check}>
           <input type="checkbox" checked={search} onChange={(e) => setSearch(e.target.checked)} /> web
           search tool
@@ -271,6 +291,9 @@ export function SetupView({ onClose }: { onClose: () => void }) {
                     {a.provider ?? "—"} · {a.model ?? "—"}
                   </div>
                   <div className={styles.cardTools}>{a.tools.length ? a.tools.join(", ") : "no tools"}</div>
+                  {a.skills.length > 0 && (
+                    <div className={styles.cardSkills}>🧩 {a.skills.join(", ")}</div>
+                  )}
                   <div className={styles.cardActions}>
                     <button onClick={() => setEditing(a)}>Edit</button>
                     {!a.is_planner && (

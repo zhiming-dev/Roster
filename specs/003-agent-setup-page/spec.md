@@ -39,8 +39,10 @@ production-ready.
   body.
 - **Brain** — provider, endpoint, model, options (temperature, max tokens), `api_key`
   (stored in `.env`, referenced as `${VAR}`). Lives in `agents.config.yaml`.
-- **Capabilities** — tools (currently `search`). Skills are a future capability (the runtime does
-  not execute skills yet) and are out of scope for this feature.
+- **Capabilities** — tools (currently `search`) and **skills**. A skill is a named markdown
+  procedure (a `SKILL.md` indexed in `shared/skills.registry.yaml`); granting a skill to an agent
+  injects its content into that agent's system prompt (the runtime's "skill execution" — see the
+  Skills section below). Stored as `skills: [...]` in the agent's `.agent.md` frontmatter.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -124,9 +126,18 @@ built-in agents (planner/coder/qa/researcher/…) from the repo are used as-is.
 - **SC-003**: Inline YAML keys can be migrated to `.env` in one click, leaving `${VAR}` references.
 - **SC-004**: A fresh install with no edits runs the built-in agents.
 
+## Skills (capability injection)
+
+A skill is a markdown procedure (`SKILL.md`) indexed in `shared/skills.registry.yaml`. The
+runtime does not run arbitrary code; "executing" a skill means **injecting its body into a
+granting agent's system prompt** at load time (under a "## Skills you have" section, each body
+capped to keep prompts bounded). The Setup editor offers the registry's skills as checkboxes per
+agent, and the grant is persisted as `skills: [...]` in the agent's `.agent.md` frontmatter.
+
 ## Out of Scope
 
-- Skills execution (the runtime doesn't run skills yet) — Setup surfaces brain/persona/tools only.
+- Skill **code execution** / sandboxing — skills here are prompt-injected procedures, not
+  runnable code.
 - Multi-user / multi-tenant config; per-user secret isolation.
 - A secrets manager / Vault (env/`.env` for now; the secret store is abstracted so it can grow).
 
@@ -147,3 +158,6 @@ and can later be backed by a DB for multi-tenant use behind the same read/write 
 - [x] T004 Frontend Setup view (in-app toggle): agent cards, edit panel (persona, provider/model/
   options, tools, key), add/remove, search config, migrate-keys, "apply to new chat".
 - [~] T005 Default fallback verified; docs updated.
+- [x] T006 Skills: `config.py` loads `shared/skills.registry.yaml` + injects granted skill bodies
+  into the agent system prompt (`agent.py`); `config_api` reads/writes `skills` in frontmatter +
+  exposes the available registry; Setup editor multi-select + agent cards show granted skills.
