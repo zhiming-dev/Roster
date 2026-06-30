@@ -38,12 +38,6 @@ export function Composer() {
   return (
     <div className={styles.composer}>
       <div className={styles.rail}>
-        {awaitingInput && (
-          <div className={styles.awaitCue}>
-            <span className={styles.awaitDot} />
-            The planner is waiting for your answer
-          </div>
-        )}
         <div className={`${styles.box} ${awaitingInput ? styles.boxAwait : ""}`}>
           <textarea
             ref={ref}

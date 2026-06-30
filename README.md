@@ -75,7 +75,7 @@ Roster/                              ← repo root
 │
 ├── runtime/                         ← MVP Python execution layer (FastAPI + Ollama + dashboard)
 │   ├── roster/                      ← orchestrator, provider abstraction, event bus, provenance
-│   ├── static/dashboard.html        ← live dashboard: agent cards, principal chat, event feed
+│   ├── static/app/                  ← built React SPA dashboard (Vite output; served at /)
 │   └── agents.config.yaml           ← per-agent model/provider binding
 │
 ├── examples/

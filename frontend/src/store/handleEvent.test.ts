@@ -82,4 +82,23 @@ describe("handleEvent reducer", () => {
     );
     expect(useStore.getState().agents.researcher.status).toBe("thinking");
   });
+
+  it("captures the planner's question and clears it on the next user turn (US4)", () => {
+    handleEvent(
+      { kind: "clarification.requested", ts: 1, question: "Which branch should I review?" },
+      true,
+    );
+    let s = useStore.getState();
+    expect(s.awaitingInput).toBe(true);
+    expect(s.clarification).toBe("Which branch should I review?");
+
+    // The principal's answer (a new user turn) resumes the run and clears the prompt.
+    handleEvent(
+      { kind: "user.message", ts: 2, from: "principal", to: "planner", content: "main" },
+      true,
+    );
+    s = useStore.getState();
+    expect(s.awaitingInput).toBe(false);
+    expect(s.clarification).toBeNull();
+  });
 });

@@ -300,8 +300,33 @@ def _load_dotenv(base_dir: Path) -> None:
         os.environ.setdefault(key.strip(), value.strip())
 
 
+# The committed template that ships the repo's built-in agents (planner/coder/…).
+EXAMPLE_CONFIG_NAME = "agents.config.example.yaml"
+
+
+def resolve_config_path(config_path: str | Path) -> Path:
+    """Resolve which config file to load.
+
+    Falls back to the committed example template (``agents.config.example.yaml`` — the
+    repo's built-in agents) when the live ``agents.config.yaml`` is absent, so a fresh
+    clone runs the built-in team with no setup (spec 003, FR-008 / SC-004).
+    """
+    p = Path(config_path).resolve()
+    if p.is_file():
+        return p
+    example = p.parent / EXAMPLE_CONFIG_NAME
+    if example.is_file():
+        log.info(
+            "config '%s' not found — falling back to built-in agents in '%s'",
+            p.name,
+            example.name,
+        )
+        return example
+    return p
+
+
 def load_config(config_path: str | Path) -> RuntimeConfig:
-    config_path = Path(config_path).resolve()
+    config_path = resolve_config_path(config_path)
     _load_dotenv(config_path.parent)
     raw = _expand_env(yaml.safe_load(config_path.read_text(encoding="utf-8")) or {})
     defaults = raw.get("defaults", {}) or {}

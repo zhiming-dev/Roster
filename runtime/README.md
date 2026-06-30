@@ -144,7 +144,7 @@ runtime/
 │   ├── store.py                ← SQLite persistence (conversations + event streams)
 │   └── server.py               ← FastAPI app: /, /api/chat, /api/agents, /api/conversations, /ws
 ├── static/
-│   └── dashboard.html          ← single-page dashboard (Apple-style UI)
+│   └── app/                    ← built React SPA (Vite output; served at /) — the dashboard
 ├── Dockerfile                  ← runtime image (build context = repo root)
 └── docker-compose.yml          ← run the app + persistent SQLite volume
 ```
@@ -152,6 +152,28 @@ runtime/
 > The `researcher` agent (in [`../researcher-agent/`](../researcher-agent/)) is the first
 > Roster agent with a real tool wired up — web search. The planner dispatches
 > live/external-fact questions to it instead of guessing.
+
+### Dashboard frontend (Vite + React + TypeScript)
+
+The dashboard is a **Vite + React + TypeScript** single-page app under
+[`../frontend/`](../frontend/) (spec 002), using [Motion](https://motion.dev) for the springy
+animations. The Python backend and its `/api/*` + `/ws` contract are unchanged — this is a
+presentation layer that consumes them.
+
+```powershell
+cd ../frontend
+npm install
+npm run dev      # Vite dev server on http://localhost:5173, proxying /api + /ws → :8765
+npm run build    # type-check + bundle → runtime/static/app/ (served by FastAPI at /)
+npm run test     # Vitest unit tests
+npm run lint     # ESLint
+```
+
+In production there is **no separate Node server**: `npm run build` emits the SPA into
+`runtime/static/app/`, and FastAPI serves it at `/`. The Docker image builds the SPA in a
+dedicated stage, so the container is self-contained; if you start the runtime without a build,
+`/` shows a short "build the dashboard" page. For local UI work, run the Python runtime
+(`python -m roster`) for the API and `npm run dev` for hot-reloading React against it.
 
 ## 6. Configuration
 
@@ -169,6 +191,13 @@ agent you set, directly there:
 | `options` | all | `temperature`, `num_predict`/`max_tokens`, … |
 
 `defaults:` are inherited by every agent; any agent may override any field.
+
+> **Built-in fallback.** You don't have to create `agents.config.yaml` to get started: if it
+> is absent, the runtime (and the in-app **Setup** page) fall back to the committed
+> [`agents.config.example.yaml`](./agents.config.example.yaml) — the repo's built-in team
+> (planner/coder/qa/researcher/…). The first edit you save in Setup materializes your own
+> `agents.config.yaml` from that template, leaving the example untouched. Secrets entered in
+> Setup are written to a gitignored `.env` and referenced from the YAML as `${VAR}`.
 
 ### Using Azure AI Foundry
 

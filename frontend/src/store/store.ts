@@ -45,6 +45,7 @@ export interface RosterState {
   // --- chat flow ---
   awaiting: boolean; // a /api/chat request is in flight
   awaitingInput: boolean; // run paused on a mid-task clarification (US4)
+  clarification: string | null; // the planner's pending question while paused (US4)
   typing: boolean; // show the planner typing indicator
   pendingUser: string | null; // optimistic user text, deduped against the echo
   draft: string; // composer text staged by suggestion chips
@@ -65,6 +66,7 @@ export interface RosterState {
   setTheme: (t: ThemePref) => void;
   setAwaiting: (b: boolean) => void;
   setAwaitingInput: (b: boolean) => void;
+  setClarification: (q: string | null) => void;
   setTyping: (b: boolean) => void;
   setPendingUser: (s: string | null) => void;
   setDraft: (s: string) => void;
@@ -87,6 +89,7 @@ export const useStore = create<RosterState>((set) => ({
   theme: initialTheme(),
   awaiting: false,
   awaitingInput: false,
+  clarification: null,
   typing: false,
   pendingUser: null,
   draft: "",
@@ -117,7 +120,9 @@ export const useStore = create<RosterState>((set) => ({
     set({ theme });
   },
   setAwaiting: (awaiting) => set({ awaiting }),
-  setAwaitingInput: (awaitingInput) => set({ awaitingInput }),
+  setAwaitingInput: (awaitingInput) =>
+    set((s) => ({ awaitingInput, clarification: awaitingInput ? s.clarification : null })),
+  setClarification: (clarification) => set({ clarification, awaitingInput: clarification != null }),
   setTyping: (typing) => set({ typing }),
   setPendingUser: (pendingUser) => set({ pendingUser }),
   setDraft: (draft) => set({ draft }),
@@ -133,6 +138,7 @@ export const useStore = create<RosterState>((set) => ({
       unread: 0,
       typing: false,
       awaitingInput: false,
+      clarification: null,
       pendingUser: null,
       draft: "",
       progress: [],

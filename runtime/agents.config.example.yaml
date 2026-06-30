@@ -8,6 +8,11 @@
 #   PowerShell:  Copy-Item agents.config.example.yaml agents.config.yaml
 #   bash:        cp agents.config.example.yaml agents.config.yaml
 #
+# You don't have to copy it to get started: if `agents.config.yaml` is absent the
+# runtime (and the in-app Setup page) fall back to THIS template — the repo's
+# built-in agents. The first edit you save in Setup materializes your own
+# `agents.config.yaml` from this file, leaving this example untouched.
+#
 # Per agent you can set, right here:
 #   provider     ollama | azure_foundry
 #   endpoint     base URL of the backend

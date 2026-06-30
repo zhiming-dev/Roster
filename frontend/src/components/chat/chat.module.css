@@ -288,28 +288,8 @@
   border-left: 2px solid var(--border-2);
 }
 
-/* "awaiting your answer" cue above the composer (US4) */
-.awaitCue {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 8px;
-  padding: 8px 14px;
-  border-radius: 12px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-}
-.awaitDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--accent);
-  flex: none;
-  animation: blink 1.2s ease-in-out infinite;
-}
+/* "awaiting your answer" affordance on the composer; the question itself renders in
+   ClarificationPrompt above the composer (US4). */
 .boxAwait {
   border-color: var(--accent);
 }

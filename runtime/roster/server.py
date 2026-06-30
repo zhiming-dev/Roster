@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import config_api
@@ -23,9 +23,25 @@ from .store import Store, db_path
 log = logging.getLogger("roster.server")
 
 STATIC_DIR = Path(__file__).parent.parent / "static"
-# The React SPA (spec 002) builds here; absent on a fresh clone, where we fall
-# back to the committed single-file dashboard so the UI still works.
+# The React SPA (spec 002) is the dashboard, served at /. It is built into static/app by
+# `npm run build` in frontend/ (the Docker image builds it in a dedicated frontend stage).
 SPA_DIR = STATIC_DIR / "app"
+
+# Shown at / when the SPA has not been built yet (a local dev run). Docker always builds it.
+_NO_BUILD_HTML = """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Roster — build the dashboard</title>
+<style>body{font-family:system-ui,sans-serif;max-width:42rem;margin:4rem auto;padding:0 1.5rem;
+line-height:1.6;color:#211b2e;background:#fbf7f1}code{background:#efe7ff;padding:.15em .4em;
+border-radius:6px}pre{background:#fff;border:1px solid #e6dcf5;border-radius:10px;padding:1rem}</style>
+</head><body>
+<h1>Dashboard not built yet</h1>
+<p>The Roster API is running, but the React dashboard has not been built. From the repo root:</p>
+<pre><code>cd frontend
+npm install
+npm run build</code></pre>
+<p>Then reload this page. For hot-reloading UI development run <code>npm run dev</code> and open the
+Vite server it prints — it proxies the API and WebSocket to this runtime.</p>
+</body></html>"""
 
 _run: Run | None = None
 _run_lock = asyncio.Lock()
@@ -128,18 +144,19 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Roster Runtime", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# Serve the built SPA's hashed assets under /app (its `base`). Mounted only when
-# a build is present; otherwise the legacy dashboard is served at / instead.
+# Serve the built SPA's hashed assets under /app (its `base`). Present whenever the
+# frontend has been built; in local dev use the Vite server (`npm run dev`) instead.
 if SPA_DIR.is_dir():
     app.mount("/app", StaticFiles(directory=str(SPA_DIR)), name="app")
 
 
 @app.get("/")
-async def index() -> FileResponse:
+async def index() -> Response:
     spa_index = SPA_DIR / "index.html"
     if spa_index.is_file():
         return FileResponse(str(spa_index))
-    return FileResponse(str(STATIC_DIR / "dashboard.html"))
+    # No build present — a local dev run that has not built the frontend yet.
+    return HTMLResponse(_NO_BUILD_HTML, status_code=503)
 
 
 @app.get("/api/health")

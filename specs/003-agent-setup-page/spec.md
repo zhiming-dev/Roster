@@ -157,7 +157,10 @@ and can later be backed by a DB for multi-tenant use behind the same read/write 
   `PUT /api/config/search`, `POST /api/config/migrate-keys`; apply via `/api/reset`.
 - [x] T004 Frontend Setup view (in-app toggle): agent cards, edit panel (persona, provider/model/
   options, tools, key), add/remove, search config, migrate-keys, "apply to new chat".
-- [~] T005 Default fallback verified; docs updated.
+- [x] T005 Default fallback verified (`config.resolve_config_path` → built-in
+  `agents.config.example.yaml` when the live config is absent; Setup reads the template but
+  writes materialize a user-owned `agents.config.yaml`); `tests/test_config_fallback.py`;
+  docs updated (runtime README + example header).
 - [x] T006 Skills: `config.py` loads `shared/skills.registry.yaml` + injects granted skill bodies
   into the agent system prompt (`agent.py`); `config_api` reads/writes `skills` in frontmatter +
   exposes the available registry; Setup editor multi-select + agent cards show granted skills.

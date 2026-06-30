@@ -28,3 +28,9 @@ Thumbs.db
 # Secrets
 **/.env
 **/*.env
+
+# Node modules — the image's frontend stage runs its own `npm install`.
+**/node_modules/
+
+# Built SPA — rebuilt in the image's frontend stage (and gitignored locally).
+runtime/static/app/

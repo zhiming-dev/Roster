@@ -117,7 +117,12 @@ accordingly.
   `ThemeToggle.tsx` (spring-sliding knob).
 - [x] T025 [US2] Apply tokens across all Phase-3 components (CSS Modules); remove any placeholder
   Apple-flat styling.
-- [~] T026 [US2] WCAG AA contrast pass on both themes; fix failing pairs (SC-003).
+- [x] T026 [US2] WCAG AA contrast pass on both themes (SC-003). Darkened light `--text-3`/
+  `--accent`/`--err`, lightened dark `--text-3`, and switched dark `--on-accent` to an ink so
+  primary text, links, error text, and button labels all clear 4.5:1; verified by
+  `frontend/src/styles/contrast.test.ts` (13 text/background pairs across both themes). The
+  same-hue status pills (`--ok`/`--warn` text on their own 10–16% tint) are intentionally left
+  vivid — darkening them to AA would mute the status palette (a separate design call).
 
 **Checkpoint**: SC-003 met; the app looks like the mockup in both themes (static).
 
@@ -156,7 +161,9 @@ real events (resolves FR-018 at plan level).
 - [x] T034 [P] [US4] `frontend/src/components/orchestration/PlanView.tsx` — decomposition
   (sub-tasks + dependencies).
 - [x] T035 [P] [US4] `CritiqueRound.tsx` — pushback + resolution exchange.
-- [~] T036 [US4] `ClarificationPrompt.tsx` + a run **"awaiting input"** state in the chat/composer.
+- [x] T036 [US4] `ClarificationPrompt.tsx` (renders the planner's pending question above the
+  composer) + the run **"awaiting input"** state in the chat/composer; the next message resumes
+  the run. The store now carries `clarification`; covered by a `handleEvent.test.ts` case.
 
 **Checkpoint**: representative 001 events render (mock); ready to wire when 001 ships.
 
@@ -164,11 +171,15 @@ real events (resolves FR-018 at plan level).
 
 ## Phase 7: Polish & cross-cutting
 
-- [ ] T037 Retire `runtime/static/dashboard.html` and make the SPA the default served file — only
-  after T020 parity passes (Constitution II).
-- [ ] T038 [P] Docs — update `runtime/README.md` + `AGENTS.md` with `frontend/` layout and the
+- [x] T037 Retired `runtime/static/dashboard.html`: the SPA is the only dashboard. `server.py`
+  serves the built SPA at `/` (and a "build the dashboard" hint page when no build is present);
+  the Docker image builds the SPA in a dedicated `frontend` stage so the container is
+  self-contained (parity T020 passed first, per Constitution II).
+- [x] T038 [P] Docs — update `runtime/README.md` + `AGENTS.md` with `frontend/` layout and the
   dev (`vite`) / build (`vite build`) / serve commands.
-- [ ] T039 [P] First-load + `/ws`-connect and bundle-size check (SC-004 single-process serve).
+- [~] T039 [P] First-load + `/ws`-connect and bundle-size check (SC-004 single-process serve).
+  Production build verified: the SPA emits to `runtime/static/app/` (single-process serve) at
+  ~293 kB JS / 53 kB CSS (gzip ~95 kB / ~18 kB). Live first-load/`/ws` smoke remains manual.
 - [ ] T040 Final a11y sweep — keyboard nav, visible focus, reduced-motion — and cleanup.
 
 ---

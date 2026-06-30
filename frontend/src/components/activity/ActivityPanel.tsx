@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import { springy } from "../../motion/springs";
 import { useStore } from "../../store/store";
 import type { ActivityItem } from "../../types/models";
+import { RichText } from "../rich/RichText";
 import styles from "./activity.module.css";
 
 function ActivityEvent({ e }: { e: ActivityItem }) {
@@ -41,7 +42,11 @@ function ActivityEvent({ e }: { e: ActivityItem }) {
           </ol>
         </div>
       ) : (
-        e.body && <div className={styles.body}>{e.body}</div>
+        e.body && (
+          <div className={styles.body}>
+            <RichText content={e.body} compact />
+          </div>
+        )
       )}
     </motion.div>
   );

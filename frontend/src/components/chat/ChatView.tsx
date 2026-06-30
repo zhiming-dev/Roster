@@ -4,6 +4,7 @@ import { bouncy } from "../../motion/springs";
 import { useStore } from "../../store/store";
 import type { ChatMessage } from "../../types/models";
 import { TraceTimeline } from "../orchestration/TraceTimeline";
+import { RichText } from "../rich/RichText";
 import styles from "./chat.module.css";
 
 const SUGGESTIONS = [
@@ -37,7 +38,9 @@ function MessageBubble({ m }: { m: ChatMessage }) {
           <span className={styles.avatar}>{emoji ?? "🤖"}</span>
           {m.author}
         </div>
-        <div className={`${styles.bubbleAgent} ${m.error ? styles.error : ""}`}>{m.content}</div>
+        <div className={`${styles.bubbleAgent} ${m.error ? styles.error : ""}`}>
+          {m.error ? m.content : <RichText content={m.content} />}
+        </div>
         {trace.length > 0 && (
           <div className={styles.trace}>
             <button className={styles.traceToggle} onClick={() => setOpen((o) => !o)}>

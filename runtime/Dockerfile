@@ -4,6 +4,19 @@
 # docker-compose.yml -> build.context: ..). Each agent's config references
 # markdown files that live OUTSIDE runtime/ (e.g. ../planner-agent/planner.agent.md),
 # so the whole repo tree must be available inside the image.
+
+# ---- Stage 1: build the React dashboard SPA (spec 002) ----------------------------
+# Vite emits to ../runtime/static/app (frontend/vite.config.ts) = /runtime/static/app in
+# this stage; the runtime stage copies it in. Building here keeps the image self-contained
+# with no committed build artifacts and no legacy HTML fallback.
+FROM node:20-slim AS frontend
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json* /frontend/
+RUN npm install
+COPY frontend/ /frontend/
+RUN npm run build
+
+# ---- Stage 2: the Python runtime --------------------------------------------------
 FROM python:3.12-slim
 
 ENV PYTHONUNBUFFERED=1 \
@@ -21,6 +34,10 @@ RUN pip install -r /app/runtime/requirements.txt
 
 # Copy the agent/skill markdown tree + runtime source.
 COPY . /app
+
+# Bring in the dashboard built in the frontend stage (provides it when the build context
+# has none, and overrides any stale local build copied from the context).
+COPY --from=frontend /runtime/static/app /app/runtime/static/app
 
 # The runtime resolves relative paths (../<role>-agent/...) from runtime/.
 WORKDIR /app/runtime

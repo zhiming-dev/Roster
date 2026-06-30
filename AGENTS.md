@@ -75,6 +75,22 @@ harness.
 5. The user chats with the **Planner only**. Do not surface sub-agents as conversational
    partners — they appear in the dashboard's event feed, not in the chat pane.
 
+## If the user asks you to work on the dashboard frontend
+
+The dashboard is a **Vite + React + TypeScript** SPA in [`frontend/`](./frontend/) (spec
+[`002-react-motion-ui-rewrite`](./specs/002-react-motion-ui-rewrite/)), animated with
+[Motion](https://motion.dev). The Python backend and its `/api/*` + `/ws` contract are unchanged.
+
+- `cd frontend && npm install`
+- `npm run dev` — Vite dev server on `:5173`, proxying `/api` + `/ws` → the runtime on `:8765`.
+- `npm run build` — type-check + bundle into `runtime/static/app/`, which FastAPI serves at `/`
+  (the Docker image builds this in a dedicated stage; without a build, `/` shows a build hint).
+- `npm run test` (Vitest) · `npm run lint` (ESLint).
+
+State lives in a Zustand store (`frontend/src/store/`); one backend event maps to store
+mutations in `handleEvent.ts`. Keep the event types in `frontend/src/types/events.ts` in sync
+with `runtime/roster/events.py`.
+
 ## If the user asks you to extend the framework
 
 - New expert role → create `<role>-agent/<role>.agent.md` + `<role>-agent/<role>-runner/SKILL.md`

@@ -15,7 +15,7 @@ from typing import Any
 
 import yaml
 
-from .config import default_emoji, skills_registry
+from .config import default_emoji, resolve_config_path, skills_registry
 
 _PROVIDERS = ["ollama", "azure_foundry", "openai_compatible"]
 _TOOLS = ["search"]
@@ -42,7 +42,10 @@ def env_path() -> Path:
 # -- raw YAML round-trip (keeps ${VAR} refs; does not expand env) --------------------
 
 def _load_raw() -> dict[str, Any]:
-    p = config_path()
+    # Reads fall back to the committed example (built-in agents) when the live config is
+    # absent; writes (``_dump_raw``) always target ``config_path()`` so a fresh clone's
+    # first edit materializes a user-owned config without touching the template.
+    p = resolve_config_path(config_path())
     if not p.is_file():
         return {}
     return yaml.safe_load(p.read_text(encoding="utf-8")) or {}

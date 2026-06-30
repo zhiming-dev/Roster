@@ -167,7 +167,7 @@ export function handleEvent(evt: RosterEvent, live = true): void {
       break;
     }
     case "clarification.requested": {
-      s.setAwaitingInput(true);
+      s.setClarification(evt.question);
       break;
     }
     case "task.dispatched":

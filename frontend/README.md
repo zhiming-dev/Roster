@@ -20,8 +20,9 @@ proxy has something to talk to.
 npm run build        # type-checks, then emits to ../runtime/static/app
 ```
 
-FastAPI serves the built app at `/`; the legacy `runtime/static/dashboard.html` remains the
-fallback until parity (spec 002, T020) is verified.
+FastAPI serves the built app at `/`. If the runtime starts without a build, `/` shows a short
+"build the dashboard" page; the Docker image builds the SPA in a dedicated stage, so the
+container is self-contained.
 
 ## Other scripts
 

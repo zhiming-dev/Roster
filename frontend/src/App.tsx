@@ -5,6 +5,7 @@ import { ActivityPanel } from "./components/activity/ActivityPanel";
 import { ChatView } from "./components/chat/ChatView";
 import { Composer } from "./components/chat/Composer";
 import { LineageGraph } from "./components/lineage/LineageGraph";
+import { ClarificationPrompt } from "./components/orchestration/ClarificationPrompt";
 import { SetupView } from "./components/setup/SetupView";
 import { Sidebar } from "./components/Sidebar";
 import { loadInitial } from "./store/actions";
@@ -86,6 +87,7 @@ export function App() {
           <>
             <LineageGraph />
             <ChatView />
+            <ClarificationPrompt />
             <Composer />
           </>
         )}
