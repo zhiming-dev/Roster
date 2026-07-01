@@ -2,7 +2,7 @@
 // runtime's REST/WS payloads exactly (see runtime/roster/server.py, bus.py,
 // store.py, search.py) so the UI consumes the backend contract without changes.
 
-export type AgentStatusValue = "idle" | "queued" | "thinking" | "searching" | "error";
+export type AgentStatusValue = "idle" | "queued" | "thinking" | "searching" | "working" | "error";
 export type MessageSubkind = "message" | "thinking" | "task_assignment" | "task_result";
 export type SearchPhase = "query" | "results" | "error";
 
@@ -10,6 +10,19 @@ export interface SearchResult {
   title: string;
   url: string;
   snippet: string;
+}
+
+// Tool-execution + approval primitives (spec 004). Mirror runtime/roster/events.py.
+export type ToolFilePhase = "read" | "write" | "diff";
+export type ToolExecPhase = "command" | "output";
+export type DiffStatus = "added" | "modified" | "deleted" | "renamed";
+export type ApprovalDecision = "approved" | "rejected";
+
+export interface FileDiffSummary {
+  path: string;
+  status: DiffStatus;
+  additions: number;
+  deletions: number;
 }
 
 // queue_stats() in runtime/roster/orchestrator.py
@@ -62,7 +75,7 @@ export interface ChatMessage {
   trace?: TraceItem[]; // collapsible per-answer process record
 }
 
-export type ActivityCategory = "message" | "search" | "error";
+export type ActivityCategory = "message" | "search" | "tool" | "approval" | "error";
 
 export interface ActivityItem {
   id: string;
@@ -110,7 +123,40 @@ export type TraceItem =
       tone?: "error";
     }
   | { id: string; kind: "result"; role: string }
-  | { id: string; kind: "critique"; round: number; concern: string; action: string; to: string | null };
+  | { id: string; kind: "critique"; round: number; concern: string; action: string; to: string | null }
+  | { id: string; kind: "file"; agent: string; role: string; phase: ToolFilePhase; path?: string; text: string }
+  | {
+      id: string;
+      kind: "exec";
+      agent: string;
+      role: string;
+      command: string;
+      exitCode?: number;
+      text: string;
+      tone?: "error";
+    }
+  | {
+      id: string;
+      kind: "diff";
+      agent: string;
+      role: string;
+      files: FileDiffSummary[];
+      patch: string;
+      truncated?: boolean;
+      text: string;
+    }
+  | {
+      id: string;
+      kind: "approval";
+      agent: string;
+      role: string;
+      propId: string;
+      tier: string;
+      action: string;
+      summary: string;
+      decision?: ApprovalDecision;
+      text: string;
+    };
 
 type DistribOmit<T, K extends keyof T> = T extends unknown ? Omit<T, K> : never;
 export type NewTraceItem = DistribOmit<TraceItem, "id">;

@@ -19,7 +19,7 @@ function Line({ item, spinning }: { item: LineItem; spinning?: boolean }) {
   } else if (item.kind === "result") {
     role = item.role;
     text = `${item.role} replied`;
-  } else {
+  } else if (item.kind === "search") {
     role = item.role;
     tone = item.tone;
     text =
@@ -28,6 +28,11 @@ function Line({ item, spinning }: { item: LineItem; spinning?: boolean }) {
         : item.phase === "results"
           ? `${item.agent}: ${item.text}`
           : `${item.agent} search failed — ${item.text}`;
+  } else {
+    // file | exec | diff | approval — one-line summary for now; rich cards land in T025 (US3).
+    role = item.role;
+    text = item.text;
+    if (item.kind === "exec") tone = item.tone;
   }
   return (
     <div className={`${styles.line} ${tone === "error" ? styles.err : ""}`}>

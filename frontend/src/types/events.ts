@@ -3,10 +3,14 @@
 
 import type {
   AgentStatusValue,
+  ApprovalDecision,
+  FileDiffSummary,
   MessageSubkind,
   QueueStats,
   SearchPhase,
   SearchResult,
+  ToolExecPhase,
+  ToolFilePhase,
 } from "./models";
 
 interface BaseEvent {
@@ -102,11 +106,55 @@ export interface ClarificationAnsweredEvent extends BaseEvent {
   answer: string;
 }
 
+// Tool-execution + approval events (spec 004). Emitted by runtime/roster/events.py.
+export interface ToolFileEvent extends BaseEvent {
+  kind: "tool.file";
+  agent: string;
+  phase: ToolFilePhase;
+  path?: string;
+  bytes?: number;
+  files?: FileDiffSummary[];
+  patch?: string;
+  truncated?: boolean;
+}
+
+export interface ToolExecEvent extends BaseEvent {
+  kind: "tool.exec";
+  agent: string;
+  phase: ToolExecPhase;
+  command: string;
+  exitCode?: number;
+  stdout?: string;
+  stderr?: string;
+  durationMs?: number;
+  timedOut?: boolean;
+  truncated?: boolean;
+}
+
+export interface ApprovalRequestedEvent extends BaseEvent {
+  kind: "approval.requested";
+  agent: string;
+  propId: string;
+  tier: string;
+  action: string;
+  summary: string;
+}
+
+export interface ApprovalResolvedEvent extends BaseEvent {
+  kind: "approval.resolved";
+  propId: string;
+  decision: ApprovalDecision;
+}
+
 export type RosterEvent =
   | UserMessageEvent
   | AgentMessageEvent
   | AgentStatusEvent
   | ToolSearchEvent
+  | ToolFileEvent
+  | ToolExecEvent
+  | ApprovalRequestedEvent
+  | ApprovalResolvedEvent
   | RuntimeErrorEvent
   | RunStartedEvent
   | PlanProposedEvent
@@ -120,6 +168,10 @@ const KNOWN_KINDS = new Set([
   "agent.message",
   "agent.status",
   "tool.search",
+  "tool.file",
+  "tool.exec",
+  "approval.requested",
+  "approval.resolved",
   "runtime.error",
   "run.started",
   "plan.proposed",

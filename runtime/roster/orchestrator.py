@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import datetime as _dt
 import logging
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -12,11 +13,15 @@ from . import events
 from .agent import Agent
 from .bus import bus
 from .config import RuntimeConfig, load_config
+from .diffutil import summarize_diff
 from .protocol import parse_planner_turn
 from .provenance import ProvenanceLog, new_run_id, runs_dir
 from .queue import LlmQueue
 from .run_state import OrchestrationState, RunStatus, TurnResult
 from .search import SearchProvider, build_search_provider
+from .task_result import build_task_result, new_task_id, write_diff_artifact, write_task_result
+from .tools import ToolExecutor
+from .workspace import Worktree, WorkspaceError, WorkspaceManager
 
 log = logging.getLogger("roster.orchestrator")
 
@@ -165,9 +170,41 @@ dispatched a single task to you. Your reply goes back to the Planner, not to the
 principal. Be concise and structured:
 
 - Restate the task in one line.
-- Describe what you did (or, in this MVP where most tools are not wired up, what you
-  WOULD do and what you'd need to actually do it).
+- Do the work with the tools available to you (described below). Act with real tools and
+  report what they ACTUALLY returned — never describe hypothetical actions or invent results.
 - Return a short, structured result the Planner can act on.
+"""
+
+_SUBAGENT_TOOLS = """\
+
+## File & shell tools
+
+You work inside an isolated git worktree of the target repository — a feature branch, never
+`main`. To use a tool, end a reply with EXACTLY ONE directive; the runtime runs it and feeds
+the result back as your next turn. Then continue, or give your final answer with no directive.
+
+Read a file (returns its real contents):
+
+    READ: path/to/file.py
+
+Create or overwrite a file — put the FULL new contents in a fenced block immediately after:
+
+    EDIT: path/to/file.py
+    ```
+    <the complete new file contents>
+    ```
+
+Run a shell command in the worktree (returns stdout, stderr, and the exit code):
+
+    EXEC: pytest -q
+
+Rules:
+- Paths are relative to the worktree; you cannot read or write outside it.
+- Make real changes by actually issuing EDIT — a real diff is produced from what you write.
+- Boundary-crossing commands (network, `git push`, `sudo`, deleting outside the worktree)
+  are BLOCKED pending human approval and come back `[blocked]` — do not retry them; continue
+  without them or tell the Planner.
+- Verify your work when you can (build/tests via EXEC), and base every claim on real output.
 """
 
 _SUBAGENT_SEARCH = """\
@@ -197,9 +234,26 @@ actually returned. You have no chat with the principal — do not address them d
 """
 
 
-def build_subagent_suffix(can_search: bool) -> str:
-    middle = _SUBAGENT_SEARCH if can_search else ""
-    return _SUBAGENT_HEAD + middle + _SUBAGENT_TAIL
+def build_subagent_suffix(can_search: bool, can_use_tools: bool = False) -> str:
+    parts = [_SUBAGENT_HEAD]
+    if can_use_tools:
+        parts.append(_SUBAGENT_TOOLS)
+    if can_search:
+        parts.append(_SUBAGENT_SEARCH)
+    parts.append(_SUBAGENT_TAIL)
+    return "".join(parts)
+
+
+_FILE_TOOL_CAPS = frozenset({"read", "edit", "execute"})
+
+
+def wants_file_tools(tools: list[str]) -> bool:
+    """True if an agent's grant includes any file/shell capability (spec 004)."""
+    return bool(_FILE_TOOL_CAPS & {t.lower() for t in tools})
+
+
+def _default_worktrees_root(target_repo: str) -> Path:
+    return Path(target_repo).resolve().parent / ".roster-worktrees"
 
 # Per principal message: one decomposition/fan-out round, then up to MAX_CRITIQUE
 # critique/verification rounds, then a synthesized answer. MAX_PLANNER_TURNS is the hard
@@ -233,6 +287,36 @@ class Run:
         self.search_cfg = cfg.search
         self.search_provider: SearchProvider | None = build_search_provider(cfg.search)
 
+        # Per-run workspace (spec 004): an isolated git worktree the Coder/E2E file & shell
+        # tools act in. Absent/invalid/dirty target → tools are unavailable and the agent says
+        # so (no fabrication) rather than the run failing.
+        self.workspace_cfg = cfg.workspace
+        self.workspace: WorkspaceManager | None = None
+        self._worktree: Worktree | None = None
+        self.workspace_error: str | None = None
+        if cfg.workspace.target_repo:
+            root = cfg.workspace.worktrees_root or str(
+                _default_worktrees_root(cfg.workspace.target_repo)
+            )
+            try:
+                self.workspace = WorkspaceManager(cfg.workspace.target_repo, root, self.run_id)
+                self._worktree = self.workspace.create("work")
+                log.info(
+                    "run %s: workspace ready at %s (%s)",
+                    self.run_id,
+                    self._worktree.path,
+                    self._worktree.branch,
+                )
+            except WorkspaceError as exc:
+                self.workspace_error = str(exc)
+                self.workspace = None
+                self._worktree = None
+                log.warning(
+                    "run %s: workspace unavailable — file/shell tools disabled: %s",
+                    self.run_id,
+                    exc,
+                )
+
         def _queue_for(name: str) -> LlmQueue | None:
             return self.llm_queue if name in require else None
 
@@ -240,6 +324,11 @@ class Run:
             if self.search_provider is None:
                 return None
             return self.search_provider if "search" in agent_cfg.tools else None
+
+        def _executor_for(agent_cfg: Any) -> ToolExecutor | None:
+            if self._worktree is None or not wants_file_tools(agent_cfg.tools):
+                return None
+            return ToolExecutor(self._worktree)
 
         # Specialist metadata for the planner's (dynamic) dispatch menu.
         specialists: list[tuple[str, str, bool]] = []
@@ -267,21 +356,24 @@ class Run:
             search=_search_for(planner_cfg),
             search_max_results=cfg.search.max_results,
         )
-        self.subagents: dict[str, Agent] = {
-            name: Agent.from_config(
+        self.subagents: dict[str, Agent] = {}
+        for name, agent_cfg in cfg.agents.items():
+            if name == "planner":
+                continue
+            search = _search_for(agent_cfg)
+            executor = _executor_for(agent_cfg)
+            self.subagents[name] = Agent.from_config(
                 agent_cfg,
                 runtime_suffix=(
-                    runtime_preamble(can_search=_search_for(agent_cfg) is not None)
+                    runtime_preamble(can_search=search is not None)
                     + "\n\n"
-                    + build_subagent_suffix(_search_for(agent_cfg) is not None)
+                    + build_subagent_suffix(search is not None, executor is not None)
                 ),
                 queue=_queue_for(name),
-                search=_search_for(agent_cfg),
+                search=search,
+                executor=executor,
                 search_max_results=cfg.search.max_results,
             )
-            for name, agent_cfg in cfg.agents.items()
-            if name != "planner"
-        }
         log.info(
             "run %s: %d agents, queue max_concurrency=%d, require_queue=%s, search=%s",
             self.run_id,
@@ -364,8 +456,41 @@ class Run:
         self.prov.emit(
             "task.result", actor=role, model=subagent.cfg.provider.target, content=sub_reply
         )
+        if subagent.executor is not None:
+            await self._finalize_tool_result(subagent, sub_reply)
         await self._publish_message(role, "planner", sub_reply, subkind="task_result")
         return role, sub_reply
+
+    async def _finalize_tool_result(self, subagent: Agent, sub_reply: str) -> None:
+        """Capture a tool-using specialist's change set: write ``diff.patch`` + a schema-valid
+        ``TaskResult``, emit the final diff event, and record provenance (spec 004, T014)."""
+        assert subagent.executor is not None
+        task_id = new_task_id()
+        patch = await asyncio.to_thread(subagent.executor.full_diff)
+        runs = runs_dir()
+        write_diff_artifact(runs, self.run_id, task_id, patch)
+        files = summarize_diff(patch)
+        result = build_task_result(
+            task_id=task_id,
+            run_id=self.run_id,
+            completed_by=subagent.cfg.name,
+            summary=sub_reply.strip()[:500],
+            patch=patch,
+        )
+        write_task_result(runs, self.run_id, result)
+        if files:
+            await events.emit_tool_file(
+                subagent.cfg.name, "diff", files=[asdict(f) for f in files], patch=patch
+            )
+        self.prov.emit(
+            "task.result.artifact",
+            actor=subagent.cfg.name,
+            taskId=task_id,
+            artifact=f"artifacts/{task_id}/diff.patch",
+            filesChanged=len(files),
+            additions=sum(f.additions for f in files),
+            deletions=sum(f.deletions for f in files),
+        )
 
     async def handle_principal_message(self, user_text: str) -> TurnResult:
         # If the run is paused on a clarification, THIS message is the answer — resume the

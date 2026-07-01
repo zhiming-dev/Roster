@@ -25,6 +25,7 @@ class _FakeAgent:
     def __init__(self, replies, target="fake"):
         self._replies = list(replies)
         self.cfg = _cfg(target)
+        self.executor = None  # mirrors Agent.executor (no file/shell tools in these tests)
         self.seen = []
 
     async def chat(self, text):

@@ -83,6 +83,16 @@ search:
   # api_key: ${TAVILY_API_KEY}
   max_results: 5
 
+# ---- Workspace (Coder / E2E file & shell tools) ------------------------------
+# The target repository Roster's Coder acts on (spec 004). Point it at a git repo;
+# each run gets an isolated worktree on a `feat/<runId>-…` branch — never `main`.
+# Leave `target_repo` unset to run without file/shell tools (agents will say so).
+# The base branch must be clean (commit or stash first). Grant an agent the tools
+# with `tools: [read, edit, execute]` (see the coder below).
+workspace:
+  # target_repo: ${ROSTER_TARGET_REPO:-}        # absolute path to a git repo
+  # worktrees_root: ${ROSTER_WORKTREES_ROOT:-}  # default: a .roster-worktrees dir beside it
+
 # ---- Agents ------------------------------------------------------------------
 agents:
   # The principal only ever talks to the planner; it dispatches to the rest.
@@ -113,6 +123,9 @@ agents:
   coder:
     agent_file: ../coder-agent/coder.agent.md
     role: coder
+    # Grant the real file & shell tools (spec 004). Requires `workspace.target_repo`
+    # above; without one the tools are simply unavailable and the Coder says so.
+    tools: [read, edit, execute]
     # A code-specialized model usually helps here, e.g.:
     # model: qwen2.5-coder:7b
 
