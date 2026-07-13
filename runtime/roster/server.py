@@ -74,6 +74,7 @@ async def _announce(run: Run) -> None:
             status=a.status,
             queued=a.queued_enabled,
             search=a.search_enabled,
+            fetch=a.fetch_enabled,
         )
     await bus.publish("run.started", runId=run.run_id, queue=run.queue_stats())
 
@@ -192,6 +193,7 @@ async def agents() -> JSONResponse:
                     "queued": a.queued_enabled,
                     "queue_waiting": a.queue_waiting,
                     "search": a.search_enabled,
+                    "fetch": a.fetch_enabled,
                     "tools": a.cfg.tools,
                     "emoji": a.cfg.emoji,
                     "color": a.cfg.color,
@@ -235,6 +237,48 @@ async def chat(payload: dict[str, Any]) -> JSONResponse:
         )
     # When the planner pauses to ask the principal, the run stays live (awaiting_input)
     # and the next /api/chat message is routed as the answer (resumed in the orchestrator).
+    if result.status == "awaiting_input":
+        return JSONResponse(
+            {"status": "awaiting_input", "question": result.text, "runId": run.run_id}
+        )
+    return JSONResponse({"status": "done", "reply": result.text, "runId": run.run_id})
+
+
+@app.post("/api/approvals/{prop_id}")
+async def resolve_approval(prop_id: str, payload: dict[str, Any]) -> JSONResponse:
+    """Decide the surfaced boundary proposal (spec 004, US2/T019).
+
+    Sugar over the ``/api/chat`` routing: body ``{"decision": "approve" | "reject"}``.
+    Approve executes the gated action and resumes the paused specialist; reject abandons it
+    and the specialist continues without it. Response shape mirrors ``/api/chat``.
+    """
+    decision = str(payload.get("decision") or "").strip().lower()
+    if decision not in ("approve", "reject"):
+        return JSONResponse(
+            {"error": "decision must be 'approve' or 'reject'"}, status_code=400
+        )
+    run = await _ensure_run()
+    if not run.has_pending_approval(prop_id):
+        return JSONResponse({"error": f"no pending approval '{prop_id}'"}, status_code=404)
+    try:
+        result = await run.resolve_approval(prop_id, decision)
+    except ProviderError as exc:
+        await bus.publish("runtime.error", scope="approval", error=str(exc))
+        return JSONResponse(
+            {"error": str(exc), "kind": "provider_error", "runId": run.run_id},
+            status_code=502,
+        )
+    except Exception as exc:
+        log.exception("approval handler failed")
+        await bus.publish("runtime.error", scope="approval", error=repr(exc))
+        return JSONResponse(
+            {
+                "error": f"{type(exc).__name__}: {exc}",
+                "kind": "internal_error",
+                "runId": run.run_id,
+            },
+            status_code=500,
+        )
     if result.status == "awaiting_input":
         return JSONResponse(
             {"status": "awaiting_input", "question": result.text, "runId": run.run_id}

@@ -204,3 +204,9 @@ of [`conclave-spec.md`](./conclave-spec.md) before submitting.
 换成结构化 function calling + 原生 Anthropic provider——顺带治好 gap 4/6。
 /api/chat 改流式（SSE/WS token 流）——体感质变。
 然后才是 DAG 依赖编排、approval-gate 落地、深度可观测。
+
+如果coder没配workspace.target_repo,生成的东西要不直接放在downloads 文件夹里吧
+"数据只能穿过 planner 传给 coder" 我确实知道这个constraint,但是这里的最优解是什么?我觉得引入subagents互相直接都能call,但是这样的话,context就乱套了,最后和用户交互的planner需要做judge,来把任务返回给用户嘛. maybe只能说subagent不止一个? subagents可以call别的subagents但是是新的instance? 不知道
+不会自然地"派 coder 去生产报告"。而且 MAX_CRITIQUE=2. 那这里最好如何改呢?
+这个打通的方法是什么?
+没有预览没关系, 扔个链接给用户,用户自己打开就好

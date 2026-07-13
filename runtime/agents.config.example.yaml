@@ -73,6 +73,8 @@ queue:
 # ---- Web search tool ---------------------------------------------------------
 # The runtime's first real tool. Agents granted `tools: [search]` (researcher and
 # qa below) can issue web searches; the wait shows up on the dashboard as `searching`.
+# Granting `fetch` as well lets an agent OPEN a url (`FETCH:`) and read its actual
+# content — pages, CSV/JSON data endpoints — instead of relying on search snippets.
 #   provider: auto         → DuckDuckGo (no key). Auto-upgrades to Tavily if a key exists.
 #   provider: tavily       → cleaner results; needs api_key or TAVILY_API_KEY env var.
 #   provider: duckduckgo   → force DuckDuckGo (no key, but flakier).
@@ -82,6 +84,16 @@ search:
   provider: auto
   # api_key: ${TAVILY_API_KEY}
   max_results: 5
+
+# ---- Workspace (Coder / E2E file & shell tools) ------------------------------
+# The target repository Roster's Coder acts on (spec 004). Point it at a git repo;
+# each run gets an isolated worktree on a `feat/<runId>-…` branch — never `main`.
+# Leave `target_repo` unset to run without file/shell tools (agents will say so).
+# The base branch must be clean (commit or stash first). Grant an agent the tools
+# with `tools: [read, edit, execute]` (see the coder below).
+workspace:
+  # target_repo: ${ROSTER_TARGET_REPO:-}        # absolute path to a git repo
+  # worktrees_root: ${ROSTER_WORKTREES_ROOT:-}  # default: a .roster-worktrees dir beside it
 
 # ---- Agents ------------------------------------------------------------------
 agents:
@@ -113,6 +125,9 @@ agents:
   coder:
     agent_file: ../coder-agent/coder.agent.md
     role: coder
+    # Grant the real file & shell tools (spec 004). Requires `workspace.target_repo`
+    # above; without one the tools are simply unavailable and the Coder says so.
+    tools: [read, edit, execute]
     # A code-specialized model usually helps here, e.g.:
     # model: qwen2.5-coder:7b
 
@@ -131,14 +146,14 @@ agents:
   qa:
     agent_file: ../qa-agent/qa.agent.md
     role: qa
-    tools: [search]
+    tools: [search, fetch]
 
   # The Researcher has the web-search tool — dispatch live/external-fact questions
   # (market data, news, weather) here instead of letting the planner guess.
   researcher:
     agent_file: ../researcher-agent/researcher.agent.md
     role: researcher
-    tools: [search]
+    tools: [search, fetch]
     options: { temperature: 0.2, num_predict: 1000 }
     # A cheap model is plenty for search + summarize, e.g. a small OpenAI-compatible one:
     # provider: openai_compatible

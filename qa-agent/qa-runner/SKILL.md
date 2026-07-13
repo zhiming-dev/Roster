@@ -42,9 +42,13 @@ For each claim, choose a verdict and back it with evidence:
 - **unsupported** — stated as fact but no source supports it; you could not find one.
 - **unverifiable** — inherently cannot be checked (opinion, private data, future event).
 
-For live or external facts, **search the web** rather than trusting the claim or your own
-memory. Prefer two independent sources for any number that matters. Note disagreements
-instead of silently picking one.
+Verification order: for a claim WITH a cited URL, **FETCH that url first** and check the
+page actually says what the claim asserts — this is the cheapest, most precise check and
+catches the worst failure (a citation that doesn't support its claim). For a claim with NO
+source, or one needing an independent second source, search — but do NOT re-run the
+queries the original specialist already ran; that reproduces its blind spots. Never trust
+the claim or your own memory for live/external facts. Prefer two independent sources for
+any number that matters. Note disagreements instead of silently picking one.
 
 ### Step 3: Check consistency & coverage
 
@@ -65,13 +69,18 @@ Notes: <non-blocking observations, style nits, suggested follow-ups>
 
 `fail` if there is any verified-false claim, any material unsupported claim, or any unmet
 blocking criterion. `pass-with-notes` if only non-blocking issues remain. `pass` only when
-the material claims are verified and the criteria are met.
+the material claims are verified and the criteria are met. Judge against the TASK'S goal,
+not the brief's wording: if the claims the conclusion rests on are unverified, that is a
+`fail` even when the brief permitted labeling items "unverified" — honest labeling does not
+make missing evidence adequate.
 
 ## Anti-patterns (do not do these)
 
 - **Rubber-stamping.** Returning `pass` without actually checking the concrete claims.
-- **Trusting a citation you didn't open.** If a claim cites a source, the source must
-  actually support it; a plausible-looking URL is not verification.
+- **Trusting a citation you didn't open.** If a claim cites a source, FETCH it — the page
+  must actually support the claim; a plausible-looking URL is not verification.
+- **Re-running the original specialist's searches.** Your job is checking ITS evidence,
+  not duplicating its retrieval — duplicate searches fail the same way twice.
 - **Upgrading "could not verify" to a pass** (or downgrading it to a fail). Report it
   honestly as what it is.
 - **Fixing the artifact.** You validate; you do not edit. Hand findings back to the Planner.

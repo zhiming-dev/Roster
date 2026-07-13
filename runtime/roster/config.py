@@ -183,6 +183,18 @@ class SearchConfig:
 
 
 @dataclass
+class WorkspaceConfig:
+    """Target repository the Coder/E2E file & shell tools operate on (spec 004).
+
+    Absent or invalid → execution tools are simply unavailable (the agent says so rather than
+    fabricate). ``worktrees_root`` defaults to a ``.roster-worktrees`` dir beside the target.
+    """
+
+    target_repo: str | None = None
+    worktrees_root: str | None = None
+
+
+@dataclass
 class AgentConfig:
     name: str
     role: str
@@ -203,6 +215,7 @@ class RuntimeConfig:
     agents: dict[str, AgentConfig]
     queue: QueueConfig
     search: SearchConfig
+    workspace: WorkspaceConfig = field(default_factory=WorkspaceConfig)
 
 
 def _merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -348,6 +361,12 @@ def load_config(config_path: str | Path) -> RuntimeConfig:
         max_results=int(s.get("max_results", 5)),
     )
 
+    w = raw.get("workspace", {}) or {}
+    workspace = WorkspaceConfig(
+        target_repo=(w.get("target_repo") or os.environ.get("ROSTER_TARGET_REPO")) or None,
+        worktrees_root=(w.get("worktrees_root") or os.environ.get("ROSTER_WORKTREES_ROOT")) or None,
+    )
+
     agents: dict[str, AgentConfig] = {}
     for name, spec in (raw.get("agents") or {}).items():
         merged = _merge(defaults, spec or {})
@@ -389,4 +408,4 @@ def load_config(config_path: str | Path) -> RuntimeConfig:
                 ", ".join(agents) or "<none>",
             )
 
-    return RuntimeConfig(agents=agents, queue=queue, search=search)
+    return RuntimeConfig(agents=agents, queue=queue, search=search, workspace=workspace)

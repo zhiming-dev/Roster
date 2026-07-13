@@ -91,12 +91,14 @@
 }
 .node[data-st="thinking"] .bubble,
 .node[data-st="searching"] .bubble,
+.node[data-st="fetching"] .bubble,
 .node[data-st="queued"] .bubble {
   border-color: color-mix(in srgb, var(--role) 55%, transparent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--role) 15%, transparent), var(--shadow-sm);
 }
 .node[data-st="thinking"] .dot,
-.node[data-st="searching"] .dot {
+.node[data-st="searching"] .dot,
+.node[data-st="fetching"] .dot {
   animation: pulse 1.1s ease-in-out infinite;
 }
 .node[data-st="error"] .bubble {

@@ -5,6 +5,9 @@
 import type {
   AgentMessageEvent,
   RosterEvent,
+  ToolExecEvent,
+  ToolFetchEvent,
+  ToolFileEvent,
   ToolSearchEvent,
 } from "../types/events";
 import type { ActivityItem } from "../types/models";
@@ -40,6 +43,46 @@ function activityFromMessage(evt: AgentMessageEvent, sub: string): Omit<Activity
   };
 }
 
+function activityFromFile(evt: ToolFileEvent): Omit<ActivityItem, "id"> {
+  let body = "";
+  if (evt.phase === "read") body = evt.path ?? "";
+  else if (evt.phase === "write") body = evt.path ?? "";
+  else if (evt.phase === "diff") {
+    const adds = (evt.files ?? []).reduce((n, f) => n + f.additions, 0);
+    const dels = (evt.files ?? []).reduce((n, f) => n + f.deletions, 0);
+    body = `${evt.files?.length ?? 0} file(s) changed, +${adds} −${dels}`;
+  }
+  return {
+    ts: evt.ts,
+    category: "tool",
+    subkind: evt.phase,
+    from: evt.agent,
+    label: `file · ${evt.phase}`,
+    role: roleOf(evt.agent),
+    body,
+    files: evt.files,
+    patch: evt.patch,
+  };
+}
+
+function activityFromExec(evt: ToolExecEvent): Omit<ActivityItem, "id"> {
+  const body =
+    evt.phase === "command"
+      ? `$ ${evt.command}`
+      : evt.timedOut
+        ? `$ ${evt.command} — timed out`
+        : `$ ${evt.command} — exit ${evt.exitCode ?? "?"}`;
+  return {
+    ts: evt.ts,
+    category: "tool",
+    subkind: evt.phase,
+    from: evt.agent,
+    label: `shell · ${evt.phase}`,
+    role: roleOf(evt.agent),
+    body,
+  };
+}
+
 function activityFromSearch(evt: ToolSearchEvent): Omit<ActivityItem, "id"> {
   let body = "";
   if (evt.phase === "query") body = `“${evt.query}”`;
@@ -54,6 +97,29 @@ function activityFromSearch(evt: ToolSearchEvent): Omit<ActivityItem, "id"> {
     role: roleOf(evt.agent),
     body,
     results: evt.results,
+  };
+}
+
+// Trim a url for one-line display: drop the scheme, keep host + tail of the path.
+function shortUrl(url: string, max = 80): string {
+  const u = (url || "").replace(/^https?:\/\//, "");
+  return u.length > max ? u.slice(0, max - 1) + "…" : u;
+}
+
+function activityFromFetch(evt: ToolFetchEvent): Omit<ActivityItem, "id"> {
+  let body = "";
+  if (evt.phase === "request") body = evt.url;
+  else if (evt.phase === "result")
+    body = `${evt.finalUrl ?? evt.url} — HTTP ${evt.statusCode ?? "?"}, ${evt.chars ?? 0} chars${evt.truncated ? " (truncated)" : ""}`;
+  else if (evt.phase === "error") body = `error for ${evt.url}: ${evt.error ?? ""}`;
+  return {
+    ts: evt.ts,
+    category: "search",
+    subkind: evt.phase,
+    from: evt.agent,
+    label: `fetch · ${evt.phase}`,
+    role: roleOf(evt.agent),
+    body,
   };
 }
 
@@ -132,6 +198,18 @@ export function handleEvent(evt: RosterEvent, live = true): void {
       }
       break;
     }
+    case "tool.fetch": {
+      s.addActivity(activityFromFetch(evt));
+      const r = roleOf(evt.agent);
+      if (evt.phase === "request") {
+        s.pushProgress({ kind: "fetch", agent: evt.agent, role: r, phase: "request", text: shortUrl(evt.url) });
+      } else if (evt.phase === "result") {
+        s.pushProgress({ kind: "fetch", agent: evt.agent, role: r, phase: "result", text: `${evt.chars ?? 0} chars from ${shortUrl(evt.finalUrl ?? evt.url, 60)}` });
+      } else if (evt.phase === "error") {
+        s.pushProgress({ kind: "fetch", agent: evt.agent, role: r, phase: "error", text: `failed: ${shortUrl(evt.url, 60)}`, tone: "error" });
+      }
+      break;
+    }
     case "runtime.error": {
       if (live) s.setTyping(false);
       s.setAwaitingInput(false);
@@ -168,6 +246,92 @@ export function handleEvent(evt: RosterEvent, live = true): void {
     }
     case "clarification.requested": {
       s.setClarification(evt.question);
+      break;
+    }
+    // ---- tool execution + the approval gate (spec 004, US3) ----
+    case "tool.file": {
+      s.addActivity(activityFromFile(evt));
+      const r = roleOf(evt.agent);
+      if (evt.phase === "read") {
+        s.pushProgress({ kind: "file", agent: evt.agent, role: r, phase: "read", path: evt.path, text: `${evt.agent} read ${evt.path ?? ""}` });
+      } else if (evt.phase === "write") {
+        s.pushProgress({ kind: "file", agent: evt.agent, role: r, phase: "write", path: evt.path, text: `${evt.agent} wrote ${evt.path ?? ""}` });
+      } else if (evt.phase === "diff" && evt.patch) {
+        const adds = (evt.files ?? []).reduce((n, f) => n + f.additions, 0);
+        const dels = (evt.files ?? []).reduce((n, f) => n + f.deletions, 0);
+        s.pushProgress({
+          kind: "diff",
+          agent: evt.agent,
+          role: r,
+          files: evt.files ?? [],
+          patch: evt.patch,
+          truncated: evt.truncated,
+          text: `${evt.files?.length ?? 0} file(s) changed, +${adds} −${dels}`,
+        });
+      }
+      break;
+    }
+    case "tool.exec": {
+      s.addActivity(activityFromExec(evt));
+      const r = roleOf(evt.agent);
+      if (evt.phase === "command") {
+        s.pushProgress({ kind: "exec", agent: evt.agent, role: r, command: evt.command, text: `$ ${firstLine(evt.command, 80)}` });
+      } else {
+        const failed = evt.timedOut || (evt.exitCode ?? 0) !== 0;
+        s.pushProgress({
+          kind: "exec",
+          agent: evt.agent,
+          role: r,
+          command: evt.command,
+          exitCode: evt.exitCode,
+          text: evt.timedOut ? `$ ${firstLine(evt.command, 60)} — timed out` : `$ ${firstLine(evt.command, 60)} — exit ${evt.exitCode ?? "?"}`,
+          tone: failed ? "error" : undefined,
+        });
+      }
+      break;
+    }
+    case "approval.requested": {
+      s.setApproval({
+        propId: evt.propId,
+        agent: evt.agent,
+        tier: evt.tier,
+        action: evt.action,
+        summary: evt.summary,
+      });
+      s.addActivity({
+        ts: evt.ts,
+        category: "approval",
+        subkind: "requested",
+        from: evt.agent,
+        label: `approval · ${evt.tier}`,
+        role: roleOf(evt.agent),
+        body: `${evt.action} — ${evt.summary}`,
+      });
+      s.pushProgress({
+        kind: "approval",
+        agent: evt.agent,
+        role: roleOf(evt.agent),
+        propId: evt.propId,
+        tier: evt.tier,
+        action: evt.action,
+        summary: evt.summary,
+        text: `${evt.agent} needs approval: ${firstLine(evt.action, 60)}`,
+      });
+      break;
+    }
+    case "approval.resolved": {
+      s.markApprovalDecision(evt.propId, evt.decision);
+      const current = useStore.getState().approval;
+      if (current?.propId === evt.propId) s.setApproval(null);
+      s.addActivity({
+        ts: evt.ts,
+        category: "approval",
+        subkind: evt.decision,
+        from: "principal",
+        label: `approval · ${evt.decision}`,
+        role: "principal",
+        body: evt.propId,
+      });
       break;
     }
     case "task.dispatched":

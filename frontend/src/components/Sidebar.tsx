@@ -51,7 +51,7 @@ export function Sidebar() {
 
   // Live queue counts derived from agent statuses (matches the legacy dashboard).
   const busy = Object.values(agents).filter(
-    (a) => a.status === "thinking" || a.status === "searching",
+    (a) => a.status === "thinking" || a.status === "searching" || a.status === "fetching",
   ).length;
   const waiting = Object.values(agents).filter((a) => a.status === "queued").length;
   const max = queue?.max_concurrency ?? 1;
