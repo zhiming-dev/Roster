@@ -12,13 +12,16 @@ and the runtime renders. Safe by construction:
   timeout, closed stdin, and a captured-output cap, so they cannot hang or flood the runtime.
 
 Synchronous (blocking subprocess / file I/O); async callers wrap calls in ``asyncio.to_thread``
-— the pattern ``store.py`` already uses. Process-group kill + output-cap tuning are hardened in
-US2 (T017); this module establishes the safe seam.
+— the pattern ``store.py`` already uses. A timed-out command is killed as a whole process
+GROUP (T017), so grandchildren spawned by a wrapper (``bash -c``, ``npm run``, …) cannot
+survive the kill or hold the output pipes open.
 """
 
 from __future__ import annotations
 
+import os
 import shlex
+import signal
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -32,6 +35,22 @@ DEFAULT_TIMEOUT_S = 120
 MAX_OUTPUT_BYTES = 64 * 1024
 MAX_READ_BYTES = 256 * 1024
 _TRUNC = "\n…[truncated]"
+
+
+class ApprovalPending(Exception):
+    """A gated tool call is awaiting the principal's decision (spec 004, US2).
+
+    Raised by the agent's tool loop when the executor returns a ``gated`` result. The
+    orchestrator catches it, surfaces an ActionProposal, and suspends the run
+    (``awaiting_input``). The paused agent's history ends with its directive reply, so the
+    decision's outcome — the real result on approve, ``[approval denied]`` on reject — resumes
+    the turn exactly where the model stopped.
+    """
+
+    def __init__(self, call: ToolCall, result: "ToolResult") -> None:
+        super().__init__(result.reason or "approval required")
+        self.call = call
+        self.result = result
 
 
 @dataclass
@@ -104,6 +123,29 @@ def _cap(text: str, limit: int) -> tuple[str, bool]:
     if len(raw.encode("utf-8", errors="replace")) <= limit:
         return raw, False
     return raw[:limit] + _TRUNC, True
+
+
+def _kill_tree(proc: subprocess.Popen) -> None:
+    """Kill a timed-out command *and* every descendant (T017 — no surviving grandchildren).
+
+    The child was started in its own session (POSIX) so its pgid == its pid; killing the group
+    takes down wrapper-spawned processes (``bash -c``, ``npm run``) that would otherwise outlive
+    the parent and hold the stdout/stderr pipes open forever. On Windows, ``taskkill /T`` walks
+    the tree.
+    """
+    try:
+        if os.name == "posix":
+            os.killpg(proc.pid, signal.SIGKILL)
+        else:  # pragma: no cover — Windows
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)], capture_output=True
+            )
+    except (ProcessLookupError, PermissionError, OSError):
+        pass
+    try:
+        proc.kill()  # belt-and-braces: the direct child dies even if the group kill failed
+    except OSError:
+        pass
 
 
 class ToolExecutor:
@@ -198,21 +240,15 @@ class ToolExecutor:
 
         start = time.monotonic()
         try:
-            proc = subprocess.run(
+            proc = subprocess.Popen(
                 argv,
                 cwd=str(self.wt.path),
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
-                timeout=self.timeout_s,
                 stdin=subprocess.DEVNULL,
-            )
-        except subprocess.TimeoutExpired as exc:
-            dur = int((time.monotonic() - start) * 1000)
-            out, _ = _cap(_as_text(exc.stdout), self.max_output)
-            err, _ = _cap(_as_text(exc.stderr), self.max_output)
-            return ToolResult(
-                "exec", "error", f"timed out after {self.timeout_s}s", command=command,
-                stdout=out, stderr=err, duration_ms=dur, timed_out=True, tier=cls.tier,
+                # Own session/process group (POSIX) so a timeout kills the whole tree.
+                start_new_session=(os.name == "posix"),
             )
         except (FileNotFoundError, OSError) as exc:
             dur = int((time.monotonic() - start) * 1000)
@@ -221,9 +257,26 @@ class ToolExecutor:
                 duration_ms=dur, reason=str(exc), tier=cls.tier,
             )
 
+        timed_out = False
+        try:
+            raw_out, raw_err = proc.communicate(timeout=self.timeout_s)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            _kill_tree(proc)
+            try:  # group is dead → pipes closed; collect whatever was written before the kill
+                raw_out, raw_err = proc.communicate(timeout=5)
+            except subprocess.TimeoutExpired:  # pragma: no cover — defensive
+                raw_out, raw_err = "", ""
+
         dur = int((time.monotonic() - start) * 1000)
-        out, out_trunc = _cap(proc.stdout, self.max_output)
-        err, err_trunc = _cap(proc.stderr, self.max_output)
+        out, out_trunc = _cap(_as_text(raw_out), self.max_output)
+        err, err_trunc = _cap(_as_text(raw_err), self.max_output)
+        if timed_out:
+            return ToolResult(
+                "exec", "error", f"timed out after {self.timeout_s}s", command=command,
+                stdout=out, stderr=err, duration_ms=dur, timed_out=True,
+                truncated=out_trunc or err_trunc, tier=cls.tier,
+            )
         status = "ok" if proc.returncode == 0 else "error"
         return ToolResult(
             "exec", status, f"exit {proc.returncode}", command=command, exit_code=proc.returncode,

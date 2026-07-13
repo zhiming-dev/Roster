@@ -28,6 +28,15 @@ function Line({ item, spinning }: { item: LineItem; spinning?: boolean }) {
         : item.phase === "results"
           ? `${item.agent}: ${item.text}`
           : `${item.agent} search failed — ${item.text}`;
+  } else if (item.kind === "fetch") {
+    role = item.role;
+    tone = item.tone;
+    text =
+      item.phase === "request"
+        ? `${item.agent} opening ${item.text}`
+        : item.phase === "result"
+          ? `${item.agent} read ${item.text}`
+          : `${item.agent} fetch ${item.text}`;
   } else {
     // file | exec | diff | approval — one-line summary for now; rich cards land in T025 (US3).
     role = item.role;

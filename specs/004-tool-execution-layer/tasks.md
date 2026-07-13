@@ -133,20 +133,27 @@ gated for human approval *before* execution.
 URL, delete outside the workspace) is blocked, surfaced for approval, and runs only after explicit
 approval — never silently (SC-002).
 
-- [ ] T016 [US2] Wire `classify_action` (T003) into `ToolExecutor`: inside-worktree + T0–T2 →
+- [x] T016 [US2] Wire `classify_action` (T003) into `ToolExecutor`: inside-worktree + T0–T2 →
   auto-run and log; out-of-tree read/write or T3+ → do not execute, raise the gate (deny with a
-  clear reason, no partial write).
-- [ ] T017 [US2] Bounded exec in `tools.py`: per-command timeout (kill the process group),
+  clear reason, no partial write). (Landed early with T010.)
+- [x] T017 [US2] Bounded exec in `tools.py`: per-command timeout (kills the whole process GROUP —
+  `start_new_session` + `killpg` / `taskkill /T`, so wrapper-spawned grandchildren die too),
   captured-output byte cap with a truncation marker, and closed stdin / no TTY. (SC-006)
-- [ ] T018 [US2] Boundary gate: emit an `ActionProposal` (validates `action-proposal.schema.json`)
-  plus an `approval.requested` event, and suspend via `run_state` `AWAITING_INPUT` (reuse spec 001 —
-  no new state machine); record the risk classification to provenance.
-- [ ] T019 [US2] Approve/reject resume in `server.py`: reuse `/api/chat` awaiting-input routing
-  (optional sugar: `POST /api/approvals/{propId}`); approve → execute + `approval.resolved(approved)`;
-  reject → abandon and tell the agent to proceed without it (the run does not re-propose / loop).
-- [ ] T020 [P] [US2] Tests: classifier-in-executor denies an out-of-tree write (no partial write);
-  a boundary command suspends (`awaiting_input`); approve executes / reject abandons; a `sleep`/`yes`
-  command is terminated within the timeout and its output truncated.
+- [x] T018 [US2] Boundary gate: gated exec raises `ApprovalPending` (T4 → refused outright, no
+  proposal, per the gate policy's backup precondition); the orchestrator writes a schema-valid
+  `ActionProposal` to `runs/<runId>/proposals/<propId>.json`, emits `approval.requested`
+  (bus + provenance), and suspends via `run_state` `AWAITING_INPUT`. Parallel siblings finish
+  first — the round freezes in `Run._round` and resumes intact. New `roster/approval.py`
+  (proposal build/write/record + conservative approve/reject parsing, EN+中文).
+- [x] T019 [US2] Approve/reject resume: `/api/chat` routes the next principal message as the
+  decision (ambiguous → re-surface, no guessed consent); approve → execute (`approved=True`) +
+  feed the REAL result + `approval.resolved(approved)`; reject → `[approval denied]` feedback,
+  abandoned exactly once. The paused specialist's turn resumes in place (`Agent.resume_turn`);
+  sugar endpoint `POST /api/approvals/{propId}` in `server.py` mirrors `/api/chat`'s shape.
+- [x] T020 [P] [US2] Tests: `test_us2_gate.py` (23 cases) — suspend + schema-valid persisted
+  proposal; approve → a REAL `git push` lands on a local bare remote (and only then); reject →
+  remote untouched, no re-proposal; ambiguous → re-ask; T4 refused inline; by-id resolution;
+  process-tree kill within timeout; output cap; decision parsing. Full suite: 127 passed.
 
 **Checkpoint**: SC-002 (100% of boundary actions gated) + SC-006 (runaways terminated).
 **MVP = Phase 3 + Phase 4** — a Coder that edits real files on an isolated branch, safely gated.

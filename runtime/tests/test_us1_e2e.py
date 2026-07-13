@@ -77,5 +77,9 @@ async def test_coder_reads_edits_and_runs_end_to_end(git_repo, runtime_config, m
         coder_history = " ".join(m["content"] for m in run.subagents["coder"].history)
         assert "[read] src/app.py" in coder_history and "VALUE = 1" in coder_history
         assert "[exec]" in coder_history and "exit 0" in coder_history
+
+        # 4. Every tool action landed in the append-only provenance log (constitution V, T021).
+        prov = (run_dir / "provenance.jsonl").read_text(encoding="utf-8")
+        assert '"tool.file"' in prov and '"tool.exec"' in prov
     finally:
         await run.aclose()

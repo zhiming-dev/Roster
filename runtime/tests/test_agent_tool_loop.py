@@ -74,14 +74,41 @@ async def test_exec_directive_runs_and_feeds_output(git_repo, tmp_path):
     assert any("[exec]" in m and wt.branch in m for m in provider.seen[1])
 
 
-async def test_gated_command_is_not_run_and_model_is_told(git_repo, tmp_path):
+async def test_gated_command_pauses_the_turn_for_approval(git_repo, tmp_path):
+    # US2: a boundary command is NOT run and the turn SUSPENDS (ApprovalPending) with the
+    # directive kept in history, so the principal's decision can resume it in place.
+    import pytest
+
+    from roster.tools import ApprovalPending
+
     agent, _, provider = _agent(
         git_repo, tmp_path,
-        ["I'll push.\nEXEC: git push origin main", "I could not push; it needs approval."],
+        ["I'll push.\nEXEC: git push origin main", "Continuing after the decision."],
     )
-    reply = await agent.chat("push please")
-    assert reply == "I could not push; it needs approval."
-    assert any("[blocked]" in m for m in provider.seen[1])
+    with pytest.raises(ApprovalPending) as exc_info:
+        await agent.chat("push please")
+    assert exc_info.value.call.command == "git push origin main"
+    assert exc_info.value.result.gated and exc_info.value.result.exit_code is None
+    assert agent.status == "blocked"
+    # History still ends with the directive reply — resumable in place.
+    assert agent.history[-1]["role"] == "assistant"
+    assert "EXEC: git push origin main" in agent.history[-1]["content"]
+
+    # Rejection feedback resumes the same turn to a final answer.
+    reply = await agent.resume_turn("[approval denied] The principal rejected it.")
+    assert reply == "Continuing after the decision."
+    assert agent.status == "idle"
+
+
+async def test_t4_command_is_refused_outright_without_pausing(git_repo, tmp_path):
+    # An irreversible (T4) action never even reaches the approval gate: refused inline.
+    agent, _, provider = _agent(
+        git_repo, tmp_path,
+        ["Wiping.\nEXEC: dd if=/dev/zero of=/dev/sda", "Understood — cannot do that."],
+    )
+    reply = await agent.chat("wipe the disk")
+    assert reply == "Understood — cannot do that."
+    assert any("[denied]" in m and "T4" in m for m in provider.seen[1])
 
 
 async def test_no_directive_returns_immediately(git_repo, tmp_path):

@@ -38,6 +38,10 @@ def _bare_run():
     run.run_id = "run_test"
     run.prov = _FakeProv()
     run.orch_state = OrchestrationState(max_critique=MAX_CRITIQUE)
+    run.pending_approvals = []  # mirrors Run.__init__ (US2 boundary-gate state)
+    run._round = None
+    run._surfaced_prop_id = None
+    run._dispatched_roles = set()  # mirrors Run.__init__ (retry-attribution tracking)
     return run
 
 
@@ -147,3 +151,109 @@ async def test_ask_suspends_then_resumes():
     assert not run.orch_state.awaiting_input
     # The task resumed (researcher ran once) rather than restarting from scratch.
     assert len(researcher.seen) == 1
+
+
+async def test_one_failed_specialist_does_not_kill_the_turn():
+    # Regression: 2026-07-01, Azure's content filter (label 'Jailbreak') blocked one of two
+    # parallel dispatches; the raw ProviderError blew through asyncio.gather and aborted the
+    # whole turn, discarding the sibling's finished work. A failure must be a RESULT the
+    # planner can recover from, not a crash.
+    from roster.providers import ProviderError
+
+    run = _bare_run()
+    run.planner = _FakeAgent(
+        [
+            "PLAN: gather + verify\nDISPATCH:researcher:find the facts\nDISPATCH:qa:verify them",
+            "Best-effort answer: facts found; verification failed and is flagged as such.",
+        ],
+        target="planner-model",
+    )
+
+    class _Boom(_FakeAgent):
+        async def chat(self, text):
+            self.seen.append(text)
+            raise ProviderError("Azure returned 400: content blocked by label 'Jailbreak'")
+
+    researcher = _FakeAgent(["real facts with sources"], target="r-model")
+    qa = _Boom([], target="qa-model")
+    run.subagents = {"researcher": researcher, "qa": qa}
+
+    result = await run.handle_principal_message("compare X and Y")
+
+    assert result.status == "done"
+    assert "Best-effort answer" in result.text
+    # The sibling's finished work survived and reached the planner alongside the failure.
+    feedback = run.planner.seen[1]
+    assert "[researcher reports]" in feedback and "real facts" in feedback
+    assert "[qa FAILED to deliver]" in feedback and "Jailbreak" in feedback
+    # The runtime tells the planner recovery is its job — and forbids inventing the result.
+    assert "Recovery is YOUR job" in feedback
+    assert "NEVER invent" in feedback
+
+
+async def test_redispatch_same_role_gets_escalation_nudge():
+    # Failure attribution: a critique round that re-runs an already-dispatched specialist
+    # is a retry — the runtime reminds the planner that a same-reason failure means the
+    # TOOL is the problem (switch specialist/tool or ASK), not the wording.
+    run = _bare_run()
+    run.planner = _FakeAgent(
+        [
+            "DISPATCH:researcher:get the VIX level",
+            "Empty result — try again with stricter sources.\nDISPATCH:researcher:get the VIX level from FRED only",
+            "Final answer with caveats.",
+        ],
+        target="planner-model",
+    )
+    researcher = _FakeAgent(["could not retrieve it", "still could not retrieve it"])
+    run.subagents = {"researcher": researcher}
+
+    result = await run.handle_principal_message("what is the VIX?")
+
+    assert result.status == "done"
+    # The fan-out round carries no retry warning; the critique round's feedback does.
+    assert "RE-dispatched" not in run.planner.seen[1]
+    assert "RE-dispatched researcher" in run.planner.seen[2]
+    assert "do NOT retry the same approach" in run.planner.seen[2]
+
+
+async def test_fresh_principal_message_resets_retry_tracking():
+    run = _bare_run()
+    run.planner = _FakeAgent(
+        ["DISPATCH:researcher:task one", "answer one",
+         "DISPATCH:researcher:task two", "answer two"],
+        target="planner-model",
+    )
+    researcher = _FakeAgent(["r1", "r2"])
+    run.subagents = {"researcher": researcher}
+
+    await run.handle_principal_message("first request")
+    assert run._dispatched_roles == {"researcher"}
+    await run.handle_principal_message("second, unrelated request")
+    # A new task starts clean: the first dispatch of the new task is not a "retry".
+    assert "RE-dispatched" not in run.planner.seen[3]
+
+
+async def test_all_specialists_failing_still_yields_an_honest_answer():
+    from roster.providers import ProviderError
+
+    run = _bare_run()
+    run.planner = _FakeAgent(
+        [
+            "DISPATCH:researcher:find the facts",
+            "I could not complete this: the research step failed. Nothing was verified.",
+        ],
+        target="planner-model",
+    )
+
+    class _Boom(_FakeAgent):
+        async def chat(self, text):
+            self.seen.append(text)
+            raise ProviderError("backend unavailable")
+
+    run.subagents = {"researcher": _Boom([], target="r-model")}
+
+    result = await run.handle_principal_message("look this up")
+
+    assert result.status == "done"
+    assert "could not complete" in result.text
+    assert "[researcher FAILED to deliver]" in run.planner.seen[1]

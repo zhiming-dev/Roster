@@ -101,3 +101,27 @@ def test_a_fenced_block_not_at_the_end_is_not_a_directive():
     # A code sample in prose (with trailing text after it) is not a trailing EDIT directive.
     reply = "Here is an example:\nEDIT: x.py\n```\nprint(1)\n```\nBut I won't apply it yet."
     assert parse_tool_call(reply) is None
+
+
+# --- has_directive_lines: misformat detection (multi-READ bug, 2026-07-01 validation run) ---
+
+def test_multiple_reads_at_once_parse_to_none_but_are_detected_as_misformat():
+    from roster.protocol import has_directive_lines
+
+    # The real failure: a coder issued several READ: lines with empty fences and trailing
+    # prose. Strict parsing yields no call, but the runtime must not take it as final.
+    reply = (
+        "Restate: add helper.\n"
+        "READ: utils.py\n```\n```\n"
+        "READ: test_utils.py\n```\n```\n"
+        "(Need to check the testing setup first.)"
+    )
+    assert parse_tool_call(reply) is None
+    assert has_directive_lines(reply)
+
+
+def test_plain_prose_has_no_directive_lines():
+    from roster.protocol import has_directive_lines
+
+    assert not has_directive_lines("All done: the helper validates emails and tests pass.")
+    assert not has_directive_lines("")

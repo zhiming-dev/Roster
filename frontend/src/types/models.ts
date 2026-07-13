@@ -2,9 +2,17 @@
 // runtime's REST/WS payloads exactly (see runtime/roster/server.py, bus.py,
 // store.py, search.py) so the UI consumes the backend contract without changes.
 
-export type AgentStatusValue = "idle" | "queued" | "thinking" | "searching" | "working" | "error";
+export type AgentStatusValue =
+  | "idle"
+  | "queued"
+  | "thinking"
+  | "searching"
+  | "fetching"
+  | "working"
+  | "error";
 export type MessageSubkind = "message" | "thinking" | "task_assignment" | "task_result";
 export type SearchPhase = "query" | "results" | "error";
+export type FetchPhase = "request" | "result" | "error";
 
 export interface SearchResult {
   title: string;
@@ -42,6 +50,7 @@ export interface AgentInfo {
   queued: boolean;
   queue_waiting: number;
   search: boolean;
+  fetch: boolean;
   tools: string[];
   description: string;
   system_prompt_chars: number;
@@ -81,13 +90,24 @@ export interface ActivityItem {
   id: string;
   ts: number;
   category: ActivityCategory;
-  subkind: string; // message subkind, search phase, or "error"
+  subkind: string; // message subkind, search phase, tool phase, or "error"
   from: string;
   to?: string;
   label: string; // short tag, e.g. "task assignment" or "search · results"
   role: string; // for color
   body: string;
   results?: SearchResult[];
+  files?: FileDiffSummary[]; // tool.file diff payload (spec 004)
+  patch?: string; // unified patch, rendered by DiffView
+}
+
+// The currently-surfaced boundary proposal (approval.requested → decided or resolved).
+export interface PendingApprovalUi {
+  propId: string;
+  agent: string;
+  tier: string;
+  action: string;
+  summary: string;
 }
 
 export interface LineageNode {
@@ -119,6 +139,15 @@ export type TraceItem =
       agent: string;
       role: string;
       phase: SearchPhase;
+      text: string;
+      tone?: "error";
+    }
+  | {
+      id: string;
+      kind: "fetch";
+      agent: string;
+      role: string;
+      phase: FetchPhase;
       text: string;
       tone?: "error";
     }

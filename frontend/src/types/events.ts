@@ -4,6 +4,7 @@
 import type {
   AgentStatusValue,
   ApprovalDecision,
+  FetchPhase,
   FileDiffSummary,
   MessageSubkind,
   QueueStats,
@@ -57,6 +58,19 @@ export interface ToolSearchEvent extends BaseEvent {
   query: string;
   count?: number;
   results?: SearchResult[];
+  error?: string;
+}
+
+export interface ToolFetchEvent extends BaseEvent {
+  kind: "tool.fetch";
+  agent: string;
+  phase: FetchPhase;
+  url: string;
+  finalUrl?: string;
+  statusCode?: number;
+  contentType?: string;
+  chars?: number;
+  truncated?: boolean;
   error?: string;
 }
 
@@ -151,6 +165,7 @@ export type RosterEvent =
   | AgentMessageEvent
   | AgentStatusEvent
   | ToolSearchEvent
+  | ToolFetchEvent
   | ToolFileEvent
   | ToolExecEvent
   | ApprovalRequestedEvent
@@ -168,6 +183,7 @@ const KNOWN_KINDS = new Set([
   "agent.message",
   "agent.status",
   "tool.search",
+  "tool.fetch",
   "tool.file",
   "tool.exec",
   "approval.requested",

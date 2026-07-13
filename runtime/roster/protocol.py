@@ -127,6 +127,20 @@ def _clean_path(p: str) -> str:
     return p
 
 
+_DIRECTIVE_LINE_RE = re.compile(r"^\s*(READ|EXEC|EDIT)\s*:", re.IGNORECASE | re.MULTILINE)
+
+
+def has_directive_lines(reply: str) -> bool:
+    """True when the reply contains tool-directive-looking lines anywhere.
+
+    ``parse_tool_call`` is deliberately strict — one *trailing* directive — so a misformatted
+    attempt (several READ: lines at once, a directive buried mid-reply) parses to ``None`` and
+    would be mistaken for a final answer. The runtime uses this looser check to send a
+    corrective message instead.
+    """
+    return _DIRECTIVE_LINE_RE.search(reply) is not None
+
+
 def parse_tool_call(reply: str) -> ToolCall | None:
     """Parse a specialist reply's trailing tool directive.
 

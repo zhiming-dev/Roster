@@ -3,12 +3,14 @@ import type {
   ActivityItem,
   AgentInfo,
   AgentStatusValue,
+  ApprovalDecision,
   ChatMessage,
   ConnectionState,
   ConversationSummary,
   LineageEdge,
   LineageNode,
   NewTraceItem,
+  PendingApprovalUi,
   QueueStats,
   TraceItem,
   ThemePref,
@@ -46,6 +48,7 @@ export interface RosterState {
   awaiting: boolean; // a /api/chat request is in flight
   awaitingInput: boolean; // run paused on a mid-task clarification (US4)
   clarification: string | null; // the planner's pending question while paused (US4)
+  approval: PendingApprovalUi | null; // surfaced boundary proposal awaiting a decision (spec 004)
   typing: boolean; // show the planner typing indicator
   pendingUser: string | null; // optimistic user text, deduped against the echo
   draft: string; // composer text staged by suggestion chips
@@ -67,6 +70,8 @@ export interface RosterState {
   setAwaiting: (b: boolean) => void;
   setAwaitingInput: (b: boolean) => void;
   setClarification: (q: string | null) => void;
+  setApproval: (a: PendingApprovalUi | null) => void;
+  markApprovalDecision: (propId: string, decision: ApprovalDecision) => void;
   setTyping: (b: boolean) => void;
   setPendingUser: (s: string | null) => void;
   setDraft: (s: string) => void;
@@ -90,6 +95,7 @@ export const useStore = create<RosterState>((set) => ({
   awaiting: false,
   awaitingInput: false,
   clarification: null,
+  approval: null,
   typing: false,
   pendingUser: null,
   draft: "",
@@ -123,6 +129,15 @@ export const useStore = create<RosterState>((set) => ({
   setAwaitingInput: (awaitingInput) =>
     set((s) => ({ awaitingInput, clarification: awaitingInput ? s.clarification : null })),
   setClarification: (clarification) => set({ clarification, awaitingInput: clarification != null }),
+  // The approval banner clears ONLY on approval.resolved (or view reset) — a chat message
+  // that turns out to be ambiguous must not dismiss a still-pending proposal.
+  setApproval: (approval) => set((s) => ({ approval, awaitingInput: approval != null || s.awaitingInput })),
+  markApprovalDecision: (propId, decision) =>
+    set((s) => ({
+      progress: s.progress.map((p) =>
+        p.kind === "approval" && p.propId === propId ? { ...p, decision } : p,
+      ),
+    })),
   setTyping: (typing) => set({ typing }),
   setPendingUser: (pendingUser) => set({ pendingUser }),
   setDraft: (draft) => set({ draft }),
@@ -139,6 +154,7 @@ export const useStore = create<RosterState>((set) => ({
       typing: false,
       awaitingInput: false,
       clarification: null,
+      approval: null,
       pendingUser: null,
       draft: "",
       progress: [],

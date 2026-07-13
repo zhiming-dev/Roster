@@ -1,0 +1,165 @@
+/* VS Code-style diff cards (spec 004, T024). Theme-aware via the app's tokens. */
+
+.diff {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.file {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.fileHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  text-align: left;
+}
+.fileHead:hover {
+  background: var(--surface-3);
+}
+
+.chev {
+  color: var(--text-3);
+  font-size: 10px;
+  flex: none;
+}
+
+.badge {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+}
+.badge.added {
+  background: var(--ok);
+}
+.badge.modified {
+  background: var(--accent);
+}
+.badge.deleted {
+  background: var(--err);
+}
+.badge.renamed {
+  background: var(--warn);
+}
+
+.path {
+  font-family: var(--font-d, ui-monospace, monospace);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+.counts {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex: none;
+  font-family: var(--font-d, ui-monospace, monospace);
+  font-size: 11.5px;
+}
+.adds {
+  color: var(--ok);
+}
+.dels {
+  color: var(--err);
+}
+
+.lines {
+  font-family: var(--font-d, ui-monospace, monospace);
+  font-size: 11.5px;
+  line-height: 1.55;
+  overflow-x: auto;
+  background: var(--surface);
+}
+
+.hunk {
+  padding: 3px 10px;
+  color: var(--text-3);
+  background: var(--surface-2);
+  border-block: 1px solid var(--border);
+  white-space: pre;
+}
+
+.lineRow {
+  display: grid;
+  grid-template-columns: 3.2em 3.2em 1.1em 1fr;
+  white-space: pre;
+}
+.lineRow .gutter {
+  color: var(--text-3);
+  text-align: right;
+  padding-right: 8px;
+  user-select: none;
+  border-right: 1px solid var(--border);
+  opacity: 0.75;
+}
+.sign {
+  text-align: center;
+  user-select: none;
+  color: var(--text-3);
+}
+.code {
+  padding-left: 6px;
+  padding-right: 10px;
+}
+
+/* Row tints: readable in both themes (color-mix keeps them on the theme surface). */
+.lineRow.add {
+  background: color-mix(in srgb, var(--ok) 14%, transparent);
+}
+.lineRow.add .sign {
+  color: var(--ok);
+}
+.lineRow.del {
+  background: color-mix(in srgb, var(--err) 12%, transparent);
+}
+.lineRow.del .sign {
+  color: var(--err);
+}
+
+.note {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+.rawToggle {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.raw {
+  margin: 0;
+  padding: 8px 10px;
+  max-height: 320px;
+  overflow: auto;
+  font-family: var(--font-d, ui-monospace, monospace);
+  font-size: 11px;
+  color: var(--text-2);
+  background: var(--surface);
+}

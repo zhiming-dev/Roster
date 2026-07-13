@@ -73,6 +73,8 @@ queue:
 # ---- Web search tool ---------------------------------------------------------
 # The runtime's first real tool. Agents granted `tools: [search]` (researcher and
 # qa below) can issue web searches; the wait shows up on the dashboard as `searching`.
+# Granting `fetch` as well lets an agent OPEN a url (`FETCH:`) and read its actual
+# content — pages, CSV/JSON data endpoints — instead of relying on search snippets.
 #   provider: auto         → DuckDuckGo (no key). Auto-upgrades to Tavily if a key exists.
 #   provider: tavily       → cleaner results; needs api_key or TAVILY_API_KEY env var.
 #   provider: duckduckgo   → force DuckDuckGo (no key, but flakier).
@@ -144,14 +146,14 @@ agents:
   qa:
     agent_file: ../qa-agent/qa.agent.md
     role: qa
-    tools: [search]
+    tools: [search, fetch]
 
   # The Researcher has the web-search tool — dispatch live/external-fact questions
   # (market data, news, weather) here instead of letting the planner guess.
   researcher:
     agent_file: ../researcher-agent/researcher.agent.md
     role: researcher
-    tools: [search]
+    tools: [search, fetch]
     options: { temperature: 0.2, num_predict: 1000 }
     # A cheap model is plenty for search + summarize, e.g. a small OpenAI-compatible one:
     # provider: openai_compatible

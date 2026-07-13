@@ -6,7 +6,10 @@ import styles from "./lineage.module.css";
 
 export function AgentNode({ node, x, y }: { node: LineageNode; x: number; y: number }) {
   const busy =
-    node.status === "thinking" || node.status === "searching" || node.status === "queued";
+    node.status === "thinking" ||
+    node.status === "searching" ||
+    node.status === "fetching" ||
+    node.status === "queued";
   // Motion owns the full transform (including the -50% centering) so it can spring
   // the scale without fighting a CSS translate.
   const style = {
