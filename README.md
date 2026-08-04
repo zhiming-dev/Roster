@@ -1,7 +1,7 @@
 # Roster
 
 > A **human-in-the-loop, hierarchical multi-agent framework** for software-engineering and
-> workflow-automation tasks — organized like a small company, with mandatory human ratification
+> workflow-automation tasks for safe and explainable autonomous AI systems. Organized like a small company, with mandatory human ratification
 > on irreversible actions.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
@@ -178,14 +178,6 @@ emerging class of autonomous LLM agents:
   without a verified path back.
 
 See [`conclave-spec.md` §11](./conclave-spec.md).
-
-## Independence statement
-
-This project originated from exploratory prototyping during a Microsoft internal hackathon and
-continues as an **independent open-source R&D effort conducted outside the scope of the author's
-employment responsibilities at Microsoft**. The goal is generalizable tooling and a peer-reviewed
-empirical study with impact beyond any single employer. Findings and tooling are released publicly
-through this repository and forthcoming peer-reviewed publication.
 
 ## License
 
