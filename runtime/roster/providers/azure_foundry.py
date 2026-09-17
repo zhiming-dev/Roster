@@ -27,7 +27,13 @@ from typing import Any
 import httpx
 
 from ..config import ProviderConfig
-from .base import Provider, ProviderError, merged_options
+from .base import (
+    Provider,
+    ProviderError,
+    content_filter_detail,
+    content_filter_error,
+    merged_options,
+)
 
 log = logging.getLogger("roster.providers.azure_foundry")
 
@@ -156,7 +162,8 @@ class AzureFoundryProvider:
             ) from exc
         except httpx.ReadTimeout as exc:
             raise ProviderError(
-                f"Azure request timed out after {self.cfg.request_timeout_s:.0f}s."
+                f"Azure request timed out after {self.cfg.request_timeout_s:.0f}s.",
+                retriable=True,
             ) from exc
         except httpx.HTTPError as exc:
             raise ProviderError(f"HTTP error talking to Azure: {exc}") from exc
@@ -177,22 +184,32 @@ class AzureFoundryProvider:
             retry_after = _parse_retry_after(r)
             raise ProviderError(
                 "Azure rate-limited this request (429)."
-                + (f" Retry after ~{retry_after:.0f}s." if retry_after else "")
-                + " Consider adding this agent to queue.require_queue.",
+                + (f" Retry after ~{retry_after:.0f}s." if retry_after else ""),
                 retry_after=retry_after,
+                retriable=True,
             )
         if r.status_code >= 400:
-            raise ProviderError(f"Azure returned {r.status_code}: {_err_text(r)[:400]}")
+            detail = content_filter_detail(_body_json(r))
+            if detail is not None:
+                raise content_filter_error("Azure", detail)
+            raise ProviderError(
+                f"Azure returned {r.status_code}: {_err_text(r)[:400]}",
+                retriable=r.status_code in (408, 500, 502, 503, 504),
+            )
 
         try:
             data = r.json()
         except Exception as exc:  # noqa: BLE001
             raise ProviderError(f"Azure returned non-JSON response: {r.text[:200]}") from exc
 
+        detail = content_filter_detail(data)
         choices = data.get("choices") or []
+        content = choices[0].get("message", {}).get("content", "") if choices else ""
+        if detail is not None and not content:
+            raise content_filter_error("Azure", detail)
         if not choices:
             raise ProviderError(f"Azure response had no choices: {str(data)[:300]}")
-        return choices[0].get("message", {}).get("content", "") or ""
+        return content or ""
 
 
 def _parse_retry_after(r: httpx.Response) -> float | None:
@@ -202,6 +219,13 @@ def _parse_retry_after(r: httpx.Response) -> float | None:
     try:
         return float(val)
     except ValueError:
+        return None
+
+
+def _body_json(r: httpx.Response) -> object:
+    try:
+        return r.json()
+    except Exception:  # noqa: BLE001
         return None
 
 

@@ -84,6 +84,7 @@ async def _ensure_run() -> Run:
     async with _run_lock:
         if _run is None:
             _run = Run(_get_config_path())
+            await _run.init_mcp()  # connect external tool servers, inject catalogs
             await _get_store().ensure_conversation(_run.run_id)
             await _announce(_run)
         return _run
@@ -108,9 +109,38 @@ async def _persist_events() -> None:
         bus.unsubscribe(q)
 
 
+def _warn_missing_optional_deps() -> None:
+    """Boot-time self-check: name every degraded tool and the exact fix.
+
+    The classic operator mistake is starting the server with a different interpreter
+    than the venv the requirements were installed into (`python -m roster` resolving to
+    an anaconda/system python). Without this check that surfaces only later, as
+    confusing mid-task tool errors.
+    """
+    import importlib.util
+    import sys
+
+    missing = [
+        (mod, tool)
+        for mod, tool in (("pypdf", "FETCH of PDFs"), ("mcp", "TOOL: (MCP)"),
+                          ("playwright", "BROWSE:"))
+        if importlib.util.find_spec(mod) is None
+    ]
+    if missing:
+        log.warning(
+            "this interpreter (%s) is missing optional deps: %s — the affected tools "
+            "will fail at use. Fix: run the server with the runtime venv "
+            "(runtime/.venv/bin/python -m roster) or `pip install -r requirements.txt` "
+            "into THIS interpreter.",
+            sys.executable,
+            ", ".join(f"{m} (breaks {t})" for m, t in missing),
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _run, _store, _persist_task
+    _warn_missing_optional_deps()
     _get_store()
     _persist_task = asyncio.create_task(_persist_events())
     run = await _ensure_run()
@@ -335,6 +365,7 @@ async def activate_conversation(conv_id: str) -> JSONResponse:
         else:
             old, _run = _run, None
             run = Run(_get_config_path(), run_id=conv_id)
+            await run.init_mcp()
             run.resume_from_events(events)
             _run = run
             if old is not None:

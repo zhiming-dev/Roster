@@ -37,6 +37,17 @@ function Line({ item, spinning }: { item: LineItem; spinning?: boolean }) {
         : item.phase === "result"
           ? `${item.agent} read ${item.text}`
           : `${item.agent} fetch ${item.text}`;
+  } else if (item.kind === "calc") {
+    role = item.role;
+    tone = item.tone;
+    text = `${item.agent} computed: ${item.text}`;
+  } else if (item.kind === "mcp") {
+    role = item.role;
+    tone = item.tone;
+    text =
+      item.phase === "call"
+        ? `${item.agent} calling tool ${item.text}`
+        : `${item.agent} tool ${item.text}`;
   } else {
     // file | exec | diff | approval — one-line summary for now; rich cards land in T025 (US3).
     role = item.role;

@@ -21,9 +21,12 @@ from typing import Any
 from . import events
 from .bus import bus
 from .config import AgentConfig
+from .browse import BrowserFetcher
+from .calc import CalcError, evaluate as calc_evaluate
 from .fetch import FetchError, WebFetcher, format_fetch_result
+from .mcptool import McpError, McpToolHost, parse_tool_args
 from .protocol import ToolCall, has_directive_lines, parse_tool_call
-from .providers import Provider, build_provider
+from .providers import Provider, ProviderError, build_provider
 from .queue import LlmQueue, QueueStats
 from .search import SearchError, SearchProvider, format_results
 from .tools import ApprovalPending, ToolExecutor, ToolResult
@@ -33,11 +36,25 @@ log = logging.getLogger("roster.agent")
 # Tool calls the model emits as the LAST line of a reply, mirroring DISPATCH:.
 SEARCH_RE = re.compile(r"^\s*SEARCH\s*:\s*(?P<query>.+?)\s*$", re.IGNORECASE)
 FETCH_RE = re.compile(r"^\s*FETCH\s*:\s*(?P<url>.+?)\s*$", re.IGNORECASE)
+BROWSE_RE = re.compile(r"^\s*BROWSE\s*:\s*(?P<url>.+?)\s*$", re.IGNORECASE)
+CALC_RE = re.compile(r"^\s*CALC\s*:\s*(?P<expr>.+?)\s*$", re.IGNORECASE)
+MCP_RE = re.compile(
+    r"^\s*TOOL\s*:\s*(?P<name>[A-Za-z0-9_.\-]+)\s*(?P<args>\{.*\})?\s*$", re.IGNORECASE
+)
+
+# Transient provider failures (429 rate limits, timeouts, 5xx) are retried with backoff
+# instead of failing the specialist's whole task. 4 attempts ≈ up to ~30s of patience.
+MAX_LLM_ATTEMPTS = 4
+_RETRY_BASE_DELAY_S = 3.0
+_RETRY_MAX_DELAY_S = 30.0
 
 MAX_SEARCHES_PER_TURN = 3
 # Fetches are cheap and precise (one url each) — a verifier opening several cited sources
 # needs more of them than it needs fresh queries.
 MAX_FETCHES_PER_TURN = 6
+MAX_BROWSES_PER_TURN = 3  # a full Chromium render each — heavier than FETCH
+MAX_CALCS_PER_TURN = 8  # sandboxed expressions are nearly free
+MAX_MCP_CALLS_PER_TURN = 8
 # Total tool directives (read/edit/exec + search) the runtime runs in one turn before forcing a
 # final answer. Generous for a coder (read a few files, edit, run tests, fix), but bounded.
 MAX_TOOL_CALLS_PER_TURN = 16
@@ -50,6 +67,9 @@ class Agent:
     queue: LlmQueue | None = None  # set when this agent must serialize through the queue
     search: SearchProvider | None = None  # set when this agent has the `search` tool
     fetcher: WebFetcher | None = None  # set when this agent has the `fetch` tool
+    browser: BrowserFetcher | None = None  # set when this agent has the `browse` tool
+    calc: bool = False  # True when this agent has the sandboxed `calc` tool
+    mcp: McpToolHost | None = None  # set when this agent has the `mcp` (TOOL:) grant
     executor: ToolExecutor | None = None  # set when this agent has file/shell tools (spec 004)
     prov: Any | None = None  # the run's ProvenanceLog; every tool action lands there (T021)
     search_max_results: int = 5
@@ -65,6 +85,9 @@ class Agent:
         queue: LlmQueue | None = None,
         search: SearchProvider | None = None,
         fetcher: WebFetcher | None = None,
+        browser: BrowserFetcher | None = None,
+        calc: bool = False,
+        mcp: McpToolHost | None = None,
         search_max_results: int = 5,
         executor: ToolExecutor | None = None,
         prov: Any | None = None,
@@ -80,6 +103,9 @@ class Agent:
             queue=queue,
             search=search,
             fetcher=fetcher,
+            browser=browser,
+            calc=calc,
+            mcp=mcp,
             executor=executor,
             prov=prov,
             search_max_results=search_max_results,
@@ -97,6 +123,14 @@ class Agent:
     @property
     def fetch_enabled(self) -> bool:
         return self.fetcher is not None
+
+    @property
+    def browse_enabled(self) -> bool:
+        return self.browser is not None
+
+    @property
+    def mcp_enabled(self) -> bool:
+        return self.mcp is not None
 
     @property
     def tools_enabled(self) -> bool:
@@ -137,39 +171,78 @@ class Agent:
         """One provider round-trip, serialized through the queue if configured."""
         if self.queue is not None:
             return await self.queue.run(
-                lambda: self.provider.chat(self.history),
+                self._chat_with_retry,
                 on_enqueue=self._on_enqueue,
                 on_start=self._on_start,
             )
         await self._set_status("thinking")
-        return await self.provider.chat(self.history)
+        return await self._chat_with_retry()
+
+    async def _chat_with_retry(self) -> str:
+        """Call the provider, retrying transient failures (429/timeout/5xx) with backoff.
+
+        Retrying INSIDE the queue slot is deliberate: while this agent waits out a rate
+        limit, siblings sharing the backend don't pile more requests onto it. Non-retriable
+        errors (auth, content filter, bad request) surface immediately.
+        """
+        delay = _RETRY_BASE_DELAY_S
+        for attempt in range(1, MAX_LLM_ATTEMPTS + 1):
+            try:
+                return await self.provider.chat(self.history)
+            except ProviderError as exc:
+                if not getattr(exc, "retriable", False) or attempt == MAX_LLM_ATTEMPTS:
+                    raise
+                wait = min(getattr(exc, "retry_after", None) or delay, _RETRY_MAX_DELAY_S)
+                log.warning(
+                    "agent %s: transient provider error (attempt %d/%d), retrying in %.0fs: %s",
+                    self.cfg.name, attempt, MAX_LLM_ATTEMPTS, wait, exc,
+                )
+                await self._set_status(
+                    "thinking", retrying=attempt, retry_in_s=round(wait, 1), error=str(exc)[:200]
+                )
+                await asyncio.sleep(wait)
+                delay *= 2
+        raise AssertionError("unreachable")  # pragma: no cover
 
     @staticmethod
-    def _parse_search(reply: str) -> str | None:
+    def _last_line(reply: str) -> str:
         lines = reply.rstrip().splitlines()
-        if not lines:
-            return None
-        m = SEARCH_RE.match(lines[-1])
-        return m.group("query").strip() if m else None
+        return lines[-1] if lines else ""
 
-    @staticmethod
-    def _parse_fetch(reply: str) -> str | None:
-        lines = reply.rstrip().splitlines()
-        if not lines:
-            return None
-        m = FETCH_RE.match(lines[-1])
-        return m.group("url").strip() if m else None
+    def _line_tools(self) -> list[tuple[str, "re.Pattern[str]", int, Any]]:
+        """The single-line directives this agent holds: (label, regex, per-turn max, runner).
+
+        Each runner takes the regex match and returns the feedback payload string. One table
+        instead of five hand-rolled parse/budget/run blocks.
+        """
+        tools: list[tuple[str, re.Pattern[str], int, Any]] = []
+        if self.search is not None:
+            tools.append(("SEARCH", SEARCH_RE, MAX_SEARCHES_PER_TURN,
+                          lambda m: self._run_search(m.group("query").strip())))
+        if self.fetcher is not None:
+            tools.append(("FETCH", FETCH_RE, MAX_FETCHES_PER_TURN,
+                          lambda m: self._run_fetch(m.group("url").strip())))
+        if self.browser is not None:
+            tools.append(("BROWSE", BROWSE_RE, MAX_BROWSES_PER_TURN,
+                          lambda m: self._run_browse(m.group("url").strip())))
+        if self.calc:
+            tools.append(("CALC", CALC_RE, MAX_CALCS_PER_TURN,
+                          lambda m: self._run_calc(m.group("expr").strip())))
+        if self.mcp is not None:
+            tools.append(("TOOL", MCP_RE, MAX_MCP_CALLS_PER_TURN,
+                          lambda m: self._run_mcp(m.group("name"), m.group("args") or "")))
+        return tools
 
     async def _run_turn(self) -> str:
-        """Generate a reply, running the tool loop (file/shell tools + web search/fetch) if
-        present.
+        """Generate a reply, running the tool loop if this agent holds any tools.
 
-        Each turn the model may end a reply with one tool directive — READ/EDIT/EXEC (spec 004),
-        SEARCH, or FETCH — which the runtime executes and feeds back as the next turn, exactly
-        like the original search loop. A reply with no directive is the final answer.
+        Each turn the model may end a reply with one tool directive — READ/EDIT/EXEC
+        (spec 004) or a single-line directive (SEARCH/FETCH/BROWSE/CALC/TOOL) — which the
+        runtime executes and feeds back as the next turn. A reply with no directive is the
+        final answer.
         """
-        searches = 0
-        fetches = 0
+        line_tools = self._line_tools()
+        used: dict[str, int] = {}
         for _ in range(MAX_TOOL_CALLS_PER_TURN):
             reply = await self._llm_call()
 
@@ -198,43 +271,30 @@ class Agent:
                 )
                 continue
 
-            query = self._parse_search(reply) if self.search is not None else None
-            if query is not None:
-                self.history.append({"role": "assistant", "content": reply})
-                if searches >= MAX_SEARCHES_PER_TURN:
-                    self.history.append(
-                        {
-                            "role": "user",
-                            "content": (
-                                "[runtime] Search budget exhausted. Answer now using what you "
-                                "have; do NOT issue another SEARCH line."
-                            ),
-                        }
-                    )
-                    return await self._llm_call()
-                searches += 1
-                self.history.append({"role": "user", "content": await self._run_search(query)})
-                continue
+            last = self._last_line(reply)
+            matched = next(
+                ((label, mx, run, m) for label, rx, mx, run in line_tools
+                 if (m := rx.match(last)) is not None),
+                None,
+            )
+            if matched is None:
+                return reply
 
-            url = self._parse_fetch(reply) if self.fetcher is not None else None
-            if url is not None:
-                self.history.append({"role": "assistant", "content": reply})
-                if fetches >= MAX_FETCHES_PER_TURN:
-                    self.history.append(
-                        {
-                            "role": "user",
-                            "content": (
-                                "[runtime] Fetch budget exhausted. Answer now using what you "
-                                "have; do NOT issue another FETCH line."
-                            ),
-                        }
-                    )
-                    return await self._llm_call()
-                fetches += 1
-                self.history.append({"role": "user", "content": await self._run_fetch(url)})
-                continue
-
-            return reply
+            label, mx, run, m = matched
+            self.history.append({"role": "assistant", "content": reply})
+            if used.get(label, 0) >= mx:
+                self.history.append(
+                    {
+                        "role": "user",
+                        "content": (
+                            f"[runtime] {label} budget exhausted ({mx} per turn). Answer now "
+                            f"using what you have; do NOT issue another {label} line."
+                        ),
+                    }
+                )
+                return await self._llm_call()
+            used[label] = used.get(label, 0) + 1
+            self.history.append({"role": "user", "content": await run(m)})
 
         # Total tool budget exhausted — force a final answer with no further tool use.
         self.history.append(
@@ -296,13 +356,100 @@ class Agent:
             )
         except FetchError as exc:
             payload = (
-                f"[fetch error] {exc}. Do not fabricate the page's contents; try a different "
-                "url or tell the Planner the fetch failed."
+                f"[fetch error] {exc}. The page's contents are UNKNOWN to you — you did NOT "
+                "see them. NEVER describe, quote, or summarize this url's content; if you "
+                "mention the url at all, state that retrieval FAILED. Try a different url or "
+                "report the failure to the Planner."
             )
             await bus.publish(
                 "tool.fetch", agent=self.cfg.name, phase="error", url=url, error=str(exc)
             )
         return f"[fetched]\n{payload}"
+
+    async def _run_browse(self, url: str) -> str:
+        """Render one url in the headless browser (emits tool.fetch events, renderer-tagged)."""
+        assert self.browser is not None
+        await self._set_status("fetching", url=url)
+        await bus.publish(
+            "tool.fetch", agent=self.cfg.name, phase="request", url=url, renderer="browser"
+        )
+        try:
+            result = await self.browser.fetch(url)
+            payload = format_fetch_result(result)
+            await bus.publish(
+                "tool.fetch",
+                agent=self.cfg.name,
+                phase="result",
+                renderer="browser",
+                **result.as_dict(),
+            )
+            self._prov_emit(
+                "tool.browse",
+                url=url,
+                finalUrl=result.final_url,
+                statusCode=result.status_code,
+                chars=len(result.text),
+                truncated=result.truncated,
+            )
+        except FetchError as exc:
+            payload = (
+                f"[browse error] {exc}. The page's contents are UNKNOWN to you — you did NOT "
+                "see them. NEVER describe, quote, or summarize this url's content; report the "
+                "failure if no alternative source works."
+            )
+            await bus.publish(
+                "tool.fetch",
+                agent=self.cfg.name,
+                phase="error",
+                url=url,
+                renderer="browser",
+                error=str(exc),
+            )
+        return f"[browsed]\n{payload}"
+
+    async def _run_calc(self, expr: str) -> str:
+        """Evaluate one sandboxed expression (emits tool.calc events)."""
+        await self._set_status("working", tool="calc")
+        try:
+            result = calc_evaluate(expr)
+            await bus.publish(
+                "tool.calc", agent=self.cfg.name, phase="result", expr=expr, result=result
+            )
+            self._prov_emit("tool.calc", expr=expr, result=result[:500])
+            payload = f"{expr}\n= {result}"
+        except CalcError as exc:
+            await bus.publish(
+                "tool.calc", agent=self.cfg.name, phase="error", expr=expr, error=str(exc)
+            )
+            payload = f"[calc error] {exc}"
+        return f"[calc]\n{payload}"
+
+    async def _run_mcp(self, name: str, raw_args: str) -> str:
+        """Invoke one external MCP tool (emits tool.mcp events)."""
+        assert self.mcp is not None
+        await self._set_status("working", tool=f"mcp:{name}")
+        await bus.publish("tool.mcp", agent=self.cfg.name, phase="call", tool=name)
+        try:
+            args = parse_tool_args(raw_args)
+            result = await self.mcp.call(name, args)
+            await bus.publish(
+                "tool.mcp",
+                agent=self.cfg.name,
+                phase="result",
+                tool=name,
+                chars=len(result),
+            )
+            self._prov_emit("tool.mcp", tool=name, args=args, chars=len(result))
+            payload = result
+        except McpError as exc:
+            await bus.publish(
+                "tool.mcp", agent=self.cfg.name, phase="error", tool=name, error=str(exc)
+            )
+            payload = (
+                f"[tool error] {exc}. Do not fabricate the tool's output; adjust the call "
+                "or report the failure."
+            )
+        return f"[tool {name}]\n{payload}"
 
     async def _run_tool(self, call: ToolCall) -> str:
         """Run one file/shell tool call off the event loop and return the feedback payload.
@@ -427,6 +574,9 @@ class Agent:
         h["queued"] = self.queued_enabled
         h["search"] = self.search_enabled
         h["fetch"] = self.fetch_enabled
+        h["browse"] = self.browse_enabled
+        h["calc"] = self.calc
+        h["mcp"] = self.mcp_enabled
         h["tools"] = self.tools_enabled
         return h
 

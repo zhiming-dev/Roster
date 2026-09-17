@@ -21,7 +21,13 @@ from typing import Any
 import httpx
 
 from ..config import ProviderConfig
-from .base import Provider, ProviderError, merged_options
+from .base import (
+    Provider,
+    ProviderError,
+    content_filter_detail,
+    content_filter_error,
+    merged_options,
+)
 
 log = logging.getLogger("roster.providers.openai_compat")
 
@@ -89,7 +95,8 @@ class OpenAICompatProvider:
             raise ProviderError(f"Cannot reach {self.cfg.endpoint}: {exc}") from exc
         except httpx.ReadTimeout as exc:
             raise ProviderError(
-                f"Request to {self.cfg.endpoint} timed out after {self.cfg.request_timeout_s:.0f}s."
+                f"Request to {self.cfg.endpoint} timed out after {self.cfg.request_timeout_s:.0f}s.",
+                retriable=True,
             ) from exc
         except httpx.HTTPError as exc:
             raise ProviderError(f"HTTP error talking to {self.cfg.endpoint}: {exc}") from exc
@@ -107,22 +114,32 @@ class OpenAICompatProvider:
             retry_after = _retry_after(r)
             raise ProviderError(
                 f"{self.cfg.endpoint} rate-limited this request (429)."
-                + (f" Retry after ~{retry_after:.0f}s." if retry_after else "")
-                + " Consider adding this agent to queue.require_queue.",
+                + (f" Retry after ~{retry_after:.0f}s." if retry_after else ""),
                 retry_after=retry_after,
+                retriable=True,
             )
         if r.status_code >= 400:
-            raise ProviderError(f"{self.cfg.endpoint} returned {r.status_code}: {_err_text(r)[:400]}")
+            detail = content_filter_detail(_body_json(r))
+            if detail is not None:
+                raise content_filter_error(self.cfg.endpoint, detail)
+            raise ProviderError(
+                f"{self.cfg.endpoint} returned {r.status_code}: {_err_text(r)[:400]}",
+                retriable=r.status_code in (408, 500, 502, 503, 504),
+            )
 
         try:
             data = r.json()
         except Exception as exc:  # noqa: BLE001
             raise ProviderError(f"Non-JSON response from {self.cfg.endpoint}: {r.text[:200]}") from exc
 
+        detail = content_filter_detail(data)
         choices = data.get("choices") or []
+        content = choices[0].get("message", {}).get("content", "") if choices else ""
+        if detail is not None and not content:
+            raise content_filter_error(self.cfg.endpoint, detail)
         if not choices:
             raise ProviderError(f"Response had no choices: {str(data)[:300]}")
-        return choices[0].get("message", {}).get("content", "") or ""
+        return content or ""
 
 
 def _retry_after(r: httpx.Response) -> float | None:
@@ -132,6 +149,13 @@ def _retry_after(r: httpx.Response) -> float | None:
     try:
         return float(val)
     except ValueError:
+        return None
+
+
+def _body_json(r: httpx.Response) -> object:
+    try:
+        return r.json()
+    except Exception:  # noqa: BLE001
         return None
 
 

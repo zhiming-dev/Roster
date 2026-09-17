@@ -146,17 +146,31 @@ agents:
   qa:
     agent_file: ../qa-agent/qa.agent.md
     role: qa
-    tools: [search, fetch]
+    tools: [search, fetch, browse, calc, mcp]
 
   # The Researcher has the web-search tool — dispatch live/external-fact questions
   # (market data, news, weather) here instead of letting the planner guess.
   researcher:
     agent_file: ../researcher-agent/researcher.agent.md
     role: researcher
-    tools: [search, fetch]
+    tools: [search, fetch, browse, calc, mcp]
     options: { temperature: 0.2, num_predict: 1000 }
     # A cheap model is plenty for search + summarize, e.g. a small OpenAI-compatible one:
     # provider: openai_compatible
     # endpoint: https://api.x.ai/v1
     # model: grok-2-mini
     # api_key: ${XAI_API_KEY}
+
+# ---- External MCP tool servers (optional) ------------------------------------
+# One client, a whole ecosystem: declare Model Context Protocol servers here and
+# every agent granted the `mcp` tool can call the tools they expose, via
+# `TOOL: <name> {json args}`. Servers are spawned over stdio; a server that fails
+# to start is skipped with a warning (the run degrades, it doesn't die).
+# mcp_servers:
+#   filesystem:
+#     command: npx
+#     args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp/shared"]
+#   github:
+#     command: npx
+#     args: ["-y", "@modelcontextprotocol/server-github"]
+#     env: { GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_TOKEN}" }

@@ -71,6 +71,25 @@ export interface ToolFetchEvent extends BaseEvent {
   contentType?: string;
   chars?: number;
   truncated?: boolean;
+  renderer?: string; // "browser" when BROWSE rendered the page
+  error?: string;
+}
+
+export interface ToolCalcEvent extends BaseEvent {
+  kind: "tool.calc";
+  agent: string;
+  phase: "result" | "error";
+  expr: string;
+  result?: string;
+  error?: string;
+}
+
+export interface ToolMcpEvent extends BaseEvent {
+  kind: "tool.mcp";
+  agent: string;
+  phase: "call" | "result" | "error";
+  tool: string;
+  chars?: number;
   error?: string;
 }
 
@@ -166,6 +185,8 @@ export type RosterEvent =
   | AgentStatusEvent
   | ToolSearchEvent
   | ToolFetchEvent
+  | ToolCalcEvent
+  | ToolMcpEvent
   | ToolFileEvent
   | ToolExecEvent
   | ApprovalRequestedEvent
@@ -184,6 +205,8 @@ const KNOWN_KINDS = new Set([
   "agent.status",
   "tool.search",
   "tool.fetch",
+  "tool.calc",
+  "tool.mcp",
   "tool.file",
   "tool.exec",
   "approval.requested",

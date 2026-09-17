@@ -1,17 +1,20 @@
 """Web page fetch — the `FETCH:` directive's backend (the runtime's second web tool).
 
 Search returns titles and ~400-char snippets; FETCH opens ONE url and returns its actual
-content — readable text for HTML pages, raw text for data endpoints (CSV/JSON/plain). This
-is what lets a researcher verify a claim against the page itself, or pull a structured
-series (e.g. FRED's ``fredgraph.csv``) instead of squinting at search snippets.
+content — readable text for HTML pages, raw text for data endpoints (CSV/JSON/plain), and
+extracted text for PDFs (reports, filings, papers). This is what lets a researcher verify
+a claim against the page itself, or pull a structured series (e.g. FRED's
+``fredgraph.csv``) instead of squinting at search snippets.
 
-Pure-ish by design: :func:`extract_text` and :func:`check_url` are stdlib-only so they can
-be unit-tested without a network; :class:`WebFetcher` owns the httpx client.
+Pure-ish by design: :func:`extract_text`, :func:`pdf_extract_text` and :func:`check_url`
+take bytes/strings so they can be unit-tested without a network; :class:`WebFetcher` owns
+the httpx client.
 """
 
 from __future__ import annotations
 
 import html
+import io
 import ipaddress
 import logging
 import re
@@ -134,6 +137,53 @@ def extract_text(html_text: str) -> str:
     return "\n".join(out).strip()
 
 
+# PDFs can be hundreds of pages; extracting them all is slow and futile when the output
+# is capped anyway. ~40 pages comfortably covers the summary/data sections of a report.
+_PDF_MAX_PAGES = 40
+
+
+def pdf_extract_text(raw: bytes, max_pages: int = _PDF_MAX_PAGES) -> str:
+    """Extract text from PDF bytes, page by page, up to ``max_pages``.
+
+    Raises :class:`FetchError` on an unparseable document (encrypted, corrupt) so the
+    agent hears an honest failure instead of an empty page.
+    """
+    try:
+        from pypdf import PdfReader
+    except ImportError as exc:  # pragma: no cover — pypdf is a declared dependency
+        raise FetchError(
+            "PDF support unavailable: pypdf is not installed in the RUNTIME'S Python "
+            "environment. Operator fix: activate runtime/.venv and run "
+            "`pip install -r requirements.txt`, then restart the server (the server may "
+            "currently be running under a different interpreter)"
+        ) from exc
+    try:
+        reader = PdfReader(io.BytesIO(raw))
+        if reader.is_encrypted:
+            # Try the empty password (common for "secured" but readable PDFs).
+            try:
+                reader.decrypt("")
+            except Exception as exc:  # noqa: BLE001
+                raise FetchError("PDF is encrypted and cannot be read") from exc
+        total = len(reader.pages)
+        pages: list[str] = []
+        for i, page in enumerate(reader.pages):
+            if i >= max_pages:
+                pages.append(f"[... {total - max_pages} more pages not extracted ...]")
+                break
+            pages.append(page.extract_text() or "")
+    except FetchError:
+        raise
+    except Exception as exc:  # noqa: BLE001 — pypdf raises a zoo of parse errors
+        raise FetchError(f"could not parse PDF: {exc}") from exc
+    text = "\n\n".join(p.strip() for p in pages if p.strip())
+    if not text:
+        raise FetchError(
+            "PDF parsed but contained no extractable text (likely a scanned/image PDF)"
+        )
+    return text
+
+
 def cap_data_text(text: str, max_chars: int) -> tuple[str, bool]:
     """Cap raw data (CSV/JSON/plain) keeping the head AND the tail.
 
@@ -200,6 +250,21 @@ class WebFetcher:
                         break
         except httpx.HTTPError as exc:
             raise FetchError(f"request failed for {cleaned}: {exc}") from exc
+
+        is_pdf = content_type == "application/pdf" or bytes(raw[:5]) == b"%PDF-"
+        if is_pdf:
+            text = pdf_extract_text(bytes(raw))
+            truncated = len(text) > self.max_chars
+            if truncated:
+                text = text[: self.max_chars]
+            return FetchResult(
+                url=cleaned,
+                final_url=str(resp.url),
+                status_code=resp.status_code,
+                content_type="application/pdf",
+                text=text,
+                truncated=truncated,
+            )
 
         if content_type and not (
             content_type.startswith("text/") or content_type in _RAW_TEXT_TYPES

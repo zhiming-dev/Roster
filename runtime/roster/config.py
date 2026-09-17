@@ -183,6 +183,21 @@ class SearchConfig:
 
 
 @dataclass
+class McpServerConfig:
+    """One external MCP server (``mcp_servers:`` section) reachable over stdio.
+
+    Agents granted the ``mcp`` tool can call every tool these servers expose via the
+    ``TOOL:`` directive. A server that fails to start is skipped with a warning.
+    """
+
+    name: str
+    command: str
+    args: list[str] = field(default_factory=list)
+    env: dict[str, str] | None = None
+    cwd: str | None = None
+
+
+@dataclass
 class WorkspaceConfig:
     """Target repository the Coder/E2E file & shell tools operate on (spec 004).
 
@@ -216,6 +231,7 @@ class RuntimeConfig:
     queue: QueueConfig
     search: SearchConfig
     workspace: WorkspaceConfig = field(default_factory=WorkspaceConfig)
+    mcp_servers: list[McpServerConfig] = field(default_factory=list)
 
 
 def _merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -367,6 +383,23 @@ def load_config(config_path: str | Path) -> RuntimeConfig:
         worktrees_root=(w.get("worktrees_root") or os.environ.get("ROSTER_WORKTREES_ROOT")) or None,
     )
 
+    mcp_servers: list[McpServerConfig] = []
+    for srv_name, srv in (raw.get("mcp_servers") or {}).items():
+        srv = srv or {}
+        command = str(srv.get("command", "")).strip()
+        if not command:
+            log.warning("mcp_servers.%s: missing `command` — skipped", srv_name)
+            continue
+        mcp_servers.append(
+            McpServerConfig(
+                name=str(srv_name),
+                command=command,
+                args=[str(a) for a in (srv.get("args") or [])],
+                env={str(k): str(v) for k, v in (srv.get("env") or {}).items()} or None,
+                cwd=str(srv["cwd"]) if srv.get("cwd") else None,
+            )
+        )
+
     agents: dict[str, AgentConfig] = {}
     for name, spec in (raw.get("agents") or {}).items():
         merged = _merge(defaults, spec or {})
@@ -408,4 +441,6 @@ def load_config(config_path: str | Path) -> RuntimeConfig:
                 ", ".join(agents) or "<none>",
             )
 
-    return RuntimeConfig(agents=agents, queue=queue, search=search, workspace=workspace)
+    return RuntimeConfig(
+        agents=agents, queue=queue, search=search, workspace=workspace, mcp_servers=mcp_servers
+    )

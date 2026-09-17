@@ -90,9 +90,78 @@ _DESTRUCTIVE = frozenset(
 _DELETE = frozenset({"rm", "del", "erase", "rmdir", "rd"})
 # git subcommands that reach a remote (network / boundary).
 _GIT_REMOTE = frozenset({"push", "pull", "fetch", "clone", "ls-remote"})
-# Operators that chain or substitute commands — a benign prefix must not hide a boundary suffix.
-_CHAIN_RE = re.compile(r"\|\||&&|;|\||\n")
-_SUBST_RE = re.compile(r"\$\(|`|>\(|<\(")
+class _Unbalanced(ValueError):
+    """The command ends inside an open quote."""
+
+
+def _split_shell(cmd: str) -> tuple[list[str], bool]:
+    """Quote-aware split of a command line into chained segments.
+
+    Returns ``(segments, has_substitution)``. Segments break at ``;``, ``|``, ``&&``,
+    ``||`` and newlines ONLY outside quotes — a ``;`` inside ``python3 -c "a; b"`` is
+    program text, not an operator (the executor runs argv directly, no shell, so quoted
+    text is always literal). Substitution markers (``$(``, backtick, ``>(``, ``<(``)
+    are flagged everywhere except inside single quotes, matching sh semantics where
+    double quotes do NOT stop expansion. Raises :class:`_Unbalanced` on an unterminated
+    quote so the caller can gate it.
+    """
+    segments: list[str] = []
+    cur: list[str] = []
+    quote: str | None = None
+    has_subst = False
+    i, n = 0, len(cmd)
+    while i < n:
+        c = cmd[i]
+        nxt = cmd[i + 1] if i + 1 < n else ""
+        if quote == "'":
+            if c == "'":
+                quote = None
+            cur.append(c)
+        elif quote == '"':
+            if c == "\\" and nxt:
+                cur.append(c)
+                cur.append(nxt)
+                i += 1
+            elif c == '"':
+                quote = None
+                cur.append(c)
+            else:
+                if c == "`" or (c == "$" and nxt == "("):
+                    has_subst = True
+                cur.append(c)
+        else:
+            if c == "\\" and nxt:
+                cur.append(c)
+                cur.append(nxt)
+                i += 1
+            elif c in ("'", '"'):
+                quote = c
+                cur.append(c)
+            elif c == "`":
+                has_subst = True
+                cur.append(c)
+            elif c in "$><" and nxt == "(":
+                has_subst = True  # $(cmd), >(cmd), <(cmd)
+                cur.append(c)
+            elif c in ";\n":
+                segments.append("".join(cur))
+                cur = []
+            elif c == "|":
+                segments.append("".join(cur))
+                cur = []
+                if nxt == "|":
+                    i += 1
+            elif c == "&" and nxt == "&":
+                segments.append("".join(cur))
+                cur = []
+                i += 1
+            else:
+                cur.append(c)
+        i += 1
+    if quote is not None:
+        raise _Unbalanced(f"unterminated {quote} quote")
+    segments.append("".join(cur))
+    return [s for s in segments if s.strip()], has_subst
 
 
 def _first_subcommand(args: list[str]) -> str | None:
@@ -120,8 +189,6 @@ def _classify_segment(segment: str) -> ActionClass:
     cmd = segment.strip()
     if not cmd:
         return ActionClass("T2", True, "shell within the worktree")
-    if _SUBST_RE.search(cmd):
-        return ActionClass("T3", False, "command substitution — gated for review")
     try:
         tokens = shlex.split(cmd, posix=True)
     except ValueError:
@@ -166,7 +233,12 @@ def _classify_exec(command: str) -> ActionClass:
     cmd = (command or "").strip()
     if not cmd:
         return ActionClass("T3", False, "empty command")
-    segments = [s for s in _CHAIN_RE.split(cmd) if s.strip()]
+    try:
+        segments, has_subst = _split_shell(cmd)
+    except _Unbalanced:
+        return ActionClass("T3", False, "unparseable command (unbalanced quotes) — gated")
+    if has_subst:
+        return ActionClass("T3", False, "command substitution — gated for review")
     if not segments:
         return ActionClass("T3", False, "empty command")
     result = _classify_segment(segments[0])

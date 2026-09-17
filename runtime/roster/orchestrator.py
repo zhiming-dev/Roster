@@ -22,8 +22,10 @@ from .approval import (
 )
 from .bus import bus
 from .config import RuntimeConfig, load_config
+from .browse import BrowserFetcher
 from .diffutil import summarize_diff
 from .fetch import WebFetcher
+from .mcptool import McpServerSpec, McpToolHost
 from .protocol import parse_planner_turn
 from .provenance import ProvenanceLog, new_run_id, runs_dir
 from .providers import ProviderError
@@ -38,7 +40,11 @@ log = logging.getLogger("roster.orchestrator")
 
 
 def runtime_preamble(
-    *, can_search: bool = False, can_fetch: bool = False, has_searcher: bool = False
+    *,
+    can_search: bool = False,
+    can_fetch: bool = False,
+    can_exec: bool = False,
+    has_searcher: bool = False,
 ) -> str:
     """A dynamic preamble prepended to every agent's system prompt.
 
@@ -52,9 +58,12 @@ def runtime_preamble(
     * ``can_search`` — this agent holds the web-search tool itself (its `SEARCH:`
       usage is spelled out later in the suffix). It must USE it for live facts.
     * ``can_fetch`` — this agent can also OPEN urls (`FETCH:`) and read their content.
+    * ``can_exec`` — this agent has REAL file & shell tools in an isolated worktree
+      (the Coder's case). It must never claim the runtime forbids running code, and
+      network-touching commands are *gated for approval*, not forbidden.
     * ``has_searcher`` — this agent can't search directly but can DISPATCH to a
       specialist that can (the Planner's case).
-    * neither — genuinely tool-less; it must say so rather than invent data.
+    * none of the above — genuinely tool-less; it must say so rather than invent data.
     """
     now = _dt.datetime.now().astimezone()
     date_part = (
@@ -70,14 +79,32 @@ def runtime_preamble(
             if can_fetch
             else ""
         )
+        exec_clause = (
+            " You ALSO have file & shell tools in an isolated worktree (see below)."
+            if can_exec
+            else " You do NOT have a file system, code execution, or other live data feeds."
+        )
         tools_part = (
             "You DO have a **web-search tool** in this runtime (its `SEARCH:` usage is "
             f"described below).{fetch_clause} USE it whenever a request needs live or external facts "
             "(news, market prices, weather, scores, recent events) — never claim you "
-            "lack web access. You do NOT have a file system, code execution, or other "
-            "live data feeds. Base every factual claim on actual search results and "
+            f"lack web access.{exec_clause} Base every factual claim on actual search results and "
             "cite their URLs; if a search returns nothing or fails, say so plainly and "
             "DO NOT invent numbers, quotes, headlines, or citations."
+        )
+    elif can_exec:
+        tools_part = (
+            "You DO have REAL file & shell tools in this runtime, acting in an isolated "
+            "git worktree (their READ/EDIT/EXEC usage is described below) — never claim "
+            "you cannot read files, write files, or run code. You have no direct "
+            "web-search tool, but shell commands MAY reach the network: commands the "
+            "runtime classifies as network egress (curl, wget, pip installs from an "
+            "index, etc.) PAUSE for the principal's explicit approval rather than being "
+            "forbidden. When a task needs external data, PROPOSE the fetch/install "
+            "command and let the approval gate decide — do NOT refuse the task upfront "
+            "by claiming the runtime prohibits network access. If an approval is denied "
+            "or a download fails, report exactly what you could not obtain — never "
+            "fabricate data, file contents, or command output."
         )
     elif has_searcher:
         tools_part = (
@@ -134,21 +161,40 @@ _ROLE_BLURBS.update({
 })
 
 
-def build_planner_suffix(specialists: list[tuple[str, str, bool, bool, bool]]) -> str:
-    """`specialists` = list of (name, blurb, can_search, can_fetch, can_write)."""
+@dataclass
+class SpecialistCaps:
+    """One specialist's entry in the planner's dispatch menu."""
+
+    name: str
+    blurb: str
+    search: bool = False
+    fetch: bool = False
+    browse: bool = False
+    calc: bool = False
+    mcp: bool = False
+    write: bool = False
+
+
+def build_planner_suffix(specialists: list[SpecialistCaps]) -> str:
     lines = []
-    for name, blurb, can_search, can_fetch, can_write in specialists:
+    for sp in specialists:
         tags = []
-        if can_search:
+        if sp.search:
             tags.append("can search the web")
-        if can_fetch:
-            tags.append("can open web pages")
-        if can_write:
+        if sp.fetch:
+            tags.append("can open web pages/PDFs")
+        if sp.browse:
+            tags.append("can render JS pages")
+        if sp.calc:
+            tags.append("can compute")
+        if sp.mcp:
+            tags.append("can call external tools")
+        if sp.write:
             tags.append("can write files & run commands")
         tag = f"  ← {', '.join(tags)}" if tags else ""
-        lines.append(f"- `{name}` — {blurb}{tag}")
-    has_searcher = any(cs for _, _, cs, _, _ in specialists)
-    has_writer = any(cw for _, _, _, _, cw in specialists)
+        lines.append(f"- `{sp.name}` — {sp.blurb}{tag}")
+    has_searcher = any(sp.search for sp in specialists)
+    has_writer = any(sp.write for sp in specialists)
     if has_searcher:
         web_rule = (
             "- For live or external facts (market data, news, weather, scores), dispatch "
@@ -317,7 +363,59 @@ back verbatim), and feeds it back as your next turn prefixed `[fetched]`. Use FE
 
 A search engine returns pages, not data points — it cannot answer "what was X on date Y".
 When a search result looks like it contains the answer, FETCH it (up to 6 fetches per
-turn). Long pages are truncated; cite only content you actually saw.
+turn). PDFs are supported — reports, filings and papers extract to text. Long content is
+truncated; cite only what you actually saw.
+"""
+
+_SUBAGENT_BROWSE = """\
+
+## Browser render tool
+
+Some pages are JS-rendered: FETCH returns an empty shell for them. For those, end a reply
+with EXACTLY one line:
+
+    BROWSE: <url>
+
+The runtime loads the page in a real headless browser, lets its scripts run, and feeds
+back the RENDERED text prefixed `[browsed]`. BROWSE is heavyweight (up to 3 per turn):
+always try FETCH first, and BROWSE only when the fetched page came back without the
+content you saw promised in search results.
+"""
+
+_SUBAGENT_CALC = """\
+
+## Calculator tool
+
+You CAN compute. To evaluate ONE Python expression in a sandbox, end a reply with:
+
+    CALC: <expression>
+
+The result comes back prefixed `[calc]`. Available: arithmetic, comparisons, list/dict
+literals and comprehensions, and these functions: abs, min, max, sum, len, round, sorted,
+mean, median, stdev, pstdev, variance, quantiles, correlation, sqrt, log, exp,
+pct_change(old, new), drawdown([values...]). No imports, no variables, no attribute
+access — paste the numbers into the expression, e.g.:
+
+    CALC: drawdown([7650.2, 7575.4, 7391.0, 7488.8])
+    CALC: pct_change(19.9, 15.84)
+
+NEVER do arithmetic in your head for numbers that matter — CALC it (up to 8 per turn).
+"""
+
+_SUBAGENT_MCP = """\
+
+## External tools (MCP)
+
+This runtime is connected to external tool servers. To call one, end a reply with EXACTLY
+one line — the tool name, then its arguments as a single-line JSON object (omit the JSON
+when the tool takes none):
+
+    TOOL: <tool_name> {"arg": "value"}
+
+The result comes back prefixed `[tool <name>]`. The catalog of available tools (names,
+arguments, descriptions) is listed in your system prompt once connected; call only tools
+from that catalog (up to 8 calls per turn). Base claims on what the tool actually
+returned.
 """
 
 _SUBAGENT_TAIL = """\
@@ -328,7 +426,12 @@ actually returned. You have no chat with the principal — do not address them d
 
 
 def build_subagent_suffix(
-    can_search: bool, can_use_tools: bool = False, can_fetch: bool = False
+    can_search: bool,
+    can_use_tools: bool = False,
+    can_fetch: bool = False,
+    can_browse: bool = False,
+    can_calc: bool = False,
+    can_mcp: bool = False,
 ) -> str:
     parts = [_SUBAGENT_HEAD]
     if can_use_tools:
@@ -337,6 +440,12 @@ def build_subagent_suffix(
         parts.append(_SUBAGENT_SEARCH)
     if can_fetch:
         parts.append(_SUBAGENT_FETCH)
+    if can_browse:
+        parts.append(_SUBAGENT_BROWSE)
+    if can_calc:
+        parts.append(_SUBAGENT_CALC)
+    if can_mcp:
+        parts.append(_SUBAGENT_MCP)
     parts.append(_SUBAGENT_TAIL)
     return "".join(parts)
 
@@ -427,6 +536,19 @@ class Run:
         self.fetcher: WebFetcher | None = (
             WebFetcher() if any("fetch" in a.tools for a in cfg.agents.values()) else None
         )
+        # One shared headless browser (`BROWSE:`); launches lazily on first use.
+        self.browser: BrowserFetcher | None = (
+            BrowserFetcher() if any("browse" in a.tools for a in cfg.agents.values()) else None
+        )
+        # One shared MCP host (`TOOL:`); connections are async — see ``init_mcp``.
+        self.mcp_host: McpToolHost | None = None
+        if cfg.mcp_servers and any("mcp" in a.tools for a in cfg.agents.values()):
+            self.mcp_host = McpToolHost(
+                [
+                    McpServerSpec(name=s.name, command=s.command, args=s.args, env=s.env, cwd=s.cwd)
+                    for s in cfg.mcp_servers
+                ]
+            )
 
         # Per-run workspace (spec 004): an isolated git worktree the Coder/E2E file & shell
         # tools act in. Absent/invalid/dirty target → tools are unavailable and the agent says
@@ -471,13 +593,26 @@ class Run:
                 return None
             return self.fetcher if "fetch" in agent_cfg.tools else None
 
+        def _browse_for(agent_cfg: Any) -> BrowserFetcher | None:
+            if self.browser is None:
+                return None
+            return self.browser if "browse" in agent_cfg.tools else None
+
+        def _calc_for(agent_cfg: Any) -> bool:
+            return "calc" in agent_cfg.tools
+
+        def _mcp_for(agent_cfg: Any) -> McpToolHost | None:
+            if self.mcp_host is None:
+                return None
+            return self.mcp_host if "mcp" in agent_cfg.tools else None
+
         def _executor_for(agent_cfg: Any) -> ToolExecutor | None:
             if self._worktree is None or not wants_file_tools(agent_cfg.tools):
                 return None
             return ToolExecutor(self._worktree)
 
         # Specialist metadata for the planner's (dynamic) dispatch menu.
-        specialists: list[tuple[str, str, bool, bool, bool]] = []
+        specialists: list[SpecialistCaps] = []
         for name, agent_cfg in cfg.agents.items():
             if name == "planner":
                 continue
@@ -489,16 +624,19 @@ class Run:
                 ),
             )
             specialists.append(
-                (
-                    name,
-                    blurb,
-                    _search_for(agent_cfg) is not None,
-                    _fetch_for(agent_cfg) is not None,
-                    can_write,
+                SpecialistCaps(
+                    name=name,
+                    blurb=blurb,
+                    search=_search_for(agent_cfg) is not None,
+                    fetch=_fetch_for(agent_cfg) is not None,
+                    browse=_browse_for(agent_cfg) is not None,
+                    calc=_calc_for(agent_cfg),
+                    mcp=_mcp_for(agent_cfg) is not None,
+                    write=can_write,
                 )
             )
 
-        has_searcher = any(can_search for _, _, can_search, _, _ in specialists)
+        has_searcher = any(sp.search for sp in specialists)
 
         planner_cfg = cfg.agents["planner"]
         planner_preamble = runtime_preamble(
@@ -522,21 +660,34 @@ class Run:
                 continue
             search = _search_for(agent_cfg)
             fetcher = _fetch_for(agent_cfg)
+            browser = _browse_for(agent_cfg)
+            calc = _calc_for(agent_cfg)
+            mcp = _mcp_for(agent_cfg)
             executor = _executor_for(agent_cfg)
             self.subagents[name] = Agent.from_config(
                 agent_cfg,
                 runtime_suffix=(
                     runtime_preamble(
-                        can_search=search is not None, can_fetch=fetcher is not None
+                        can_search=search is not None,
+                        can_fetch=fetcher is not None,
+                        can_exec=executor is not None,
                     )
                     + "\n\n"
                     + build_subagent_suffix(
-                        search is not None, executor is not None, fetcher is not None
+                        search is not None,
+                        executor is not None,
+                        fetcher is not None,
+                        can_browse=browser is not None,
+                        can_calc=calc,
+                        can_mcp=mcp is not None,
                     )
                 ),
                 queue=_queue_for(name),
                 search=search,
                 fetcher=fetcher,
+                browser=browser,
+                calc=calc,
+                mcp=mcp,
                 executor=executor,
                 prov=self.prov,  # every tool action lands in provenance.jsonl (T021)
                 search_max_results=cfg.search.max_results,
@@ -552,6 +703,37 @@ class Run:
 
     def all_agents(self) -> list[Agent]:
         return [self.planner, *self.subagents.values()]
+
+    async def init_mcp(self) -> None:
+        """Connect the configured MCP servers and inject the live tool catalog into every
+        granted agent's system prompt.
+
+        Async because MCP handshakes are; called once by the server right after the run is
+        constructed. Idempotent and failure-tolerant: a dead server is skipped (logged),
+        and with no catalog the granted agents simply keep their generic TOOL: section.
+        """
+        if self.mcp_host is None or self.mcp_host.started:
+            return
+        try:
+            await self.mcp_host.start()
+        except Exception:  # noqa: BLE001 — external servers must not kill the run
+            log.warning("run %s: MCP startup failed", self.run_id, exc_info=True)
+            return
+        catalog = self.mcp_host.catalog_prompt()
+        if not catalog:
+            return
+        for agent in self.all_agents():
+            if agent.mcp is None:
+                continue
+            if agent.history and agent.history[0].get("role") == "system":
+                agent.history[0]["content"] += "\n\n---\n\n" + catalog
+        log.info(
+            "run %s: MCP connected — %d tools from %d server(s)%s",
+            self.run_id,
+            len(self.mcp_host.tools),
+            len(self.mcp_host._specs) - len(self.mcp_host.errors),
+            f" ({len(self.mcp_host.errors)} failed)" if self.mcp_host.errors else "",
+        )
 
     def resume_from_events(self, events: list[dict[str, Any]]) -> None:
         """Seed the planner's chat history from a persisted conversation so it can
@@ -605,6 +787,16 @@ class Run:
                 await self.fetcher.aclose()
             except Exception:  # noqa: BLE001 - best-effort cleanup
                 log.debug("fetcher aclose failed", exc_info=True)
+        if self.browser is not None:
+            try:
+                await self.browser.aclose()
+            except Exception:  # noqa: BLE001 - best-effort cleanup
+                log.debug("browser aclose failed", exc_info=True)
+        if self.mcp_host is not None:
+            try:
+                await self.mcp_host.aclose()
+            except Exception:  # noqa: BLE001 - best-effort cleanup
+                log.debug("mcp host aclose failed", exc_info=True)
 
     async def health(self) -> list[dict[str, Any]]:
         return [await a.health() for a in self.all_agents()]
@@ -964,8 +1156,20 @@ class Run:
                 )
                 continue
 
-            valid = [(r, t) for (r, t) in turn.dispatches if r in self.subagents]
-            unknown = [r for (r, _t) in turn.dispatches if r not in self.subagents]
+            # Models occasionally emit the same DISPATCH line twice; running both doubles
+            # the cost and invites rate limits, so identical (role, task) pairs collapse.
+            deduped: list[tuple[str, str]] = []
+            for pair in turn.dispatches:
+                if pair not in deduped:
+                    deduped.append(pair)
+            if len(deduped) < len(turn.dispatches):
+                log.info(
+                    "run %s: dropped %d duplicate dispatch line(s)",
+                    self.run_id,
+                    len(turn.dispatches) - len(deduped),
+                )
+            valid = [(r, t) for (r, t) in deduped if r in self.subagents]
+            unknown = [r for (r, _t) in deduped if r not in self.subagents]
 
             if turn.prose:
                 await self._publish_message("planner", "principal", turn.prose, subkind="thinking")

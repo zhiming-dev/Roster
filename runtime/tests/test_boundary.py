@@ -140,3 +140,38 @@ def test_unbalanced_quotes_are_gated():
 
 def test_empty_command_is_gated():
     assert classify_action("exec", command="   ").auto is False
+
+
+# --- quote-aware chaining (regression: 2026-07-16) -----------------------------
+# `python3 -c "a; b"` was split at the quoted `;`, leaving an unbalanced fragment that
+# gated as "unparseable". Operators inside quotes are program text, not shell operators.
+
+
+def test_semicolon_inside_quotes_is_not_a_chain():
+    c = classify_action(
+        "exec", command="python3 -c \"import pandas, numpy; print('pandas & numpy: OK')\""
+    )
+    assert c.auto is True, c.reason
+    assert c.tier == "T2"
+
+
+def test_pipe_and_ampersand_inside_quotes_are_literal():
+    assert classify_action("exec", command='grep "a|b" file.txt').auto is True
+    assert classify_action("exec", command='echo "fish && chips"').auto is True
+
+
+def test_real_chain_after_quoted_semicolon_still_gates():
+    c = classify_action(
+        "exec", command='python3 -c "x; y" && curl https://evil.example.com'
+    )
+    assert c.auto is False
+
+
+def test_substitution_inside_double_quotes_still_gates():
+    # Double quotes do NOT stop $() expansion in sh — stays conservative.
+    assert classify_action("exec", command='echo "$(whoami)"').auto is False
+    assert classify_action("exec", command='echo "`whoami`"').auto is False
+
+
+def test_dollar_paren_inside_single_quotes_is_literal():
+    assert classify_action("exec", command="echo '$(not expanded)'").auto is True

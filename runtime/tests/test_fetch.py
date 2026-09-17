@@ -13,6 +13,7 @@ from roster.fetch import (
     check_url,
     extract_text,
     format_fetch_result,
+    pdf_extract_text,
 )
 
 # ---- check_url: only public http(s) targets are fetchable --------------------------
@@ -72,6 +73,45 @@ def test_extract_text_drops_scripts_and_keeps_structure():
 def test_extract_text_collapses_blank_runs():
     text = extract_text("<div>a</div><br><br><br><div>b</div>")
     assert text.splitlines().count("") <= 1
+
+
+# ---- pdf_extract_text ----------------------------------------------------------------
+
+
+def _mini_pdf(text: str) -> bytes:
+    """Hand-build a minimal single-page PDF containing ``text`` (valid xref included)."""
+    stream = f"BT /F1 24 Tf 72 700 Td ({text}) Tj ET".encode()
+    objs = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R "
+        b"/Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out = bytearray(b"%PDF-1.4\n")
+    offsets = []
+    for i, body in enumerate(objs, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % i + body + b"\nendobj\n"
+    xref_pos = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1)
+    for off in offsets:
+        out += b"%010d 00000 n \n" % off
+    out += b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (
+        len(objs) + 1,
+        xref_pos,
+    )
+    return bytes(out)
+
+
+def test_pdf_extract_text_reads_page_text():
+    assert "Crisis Report 2008" in pdf_extract_text(_mini_pdf("Crisis Report 2008"))
+
+
+def test_pdf_extract_text_rejects_garbage():
+    with pytest.raises(FetchError):
+        pdf_extract_text(b"%PDF-1.4 this is not really a pdf")
 
 
 # ---- cap_data_text: raw data keeps its TAIL (the freshest rows) ---------------------
@@ -190,7 +230,7 @@ async def test_fetch_budget_forces_final_answer():
     reply = await agent.chat("fetch forever")
     assert reply == "final answer after budget"
     assert len(fetcher.fetched) == MAX_FETCHES_PER_TURN
-    assert any("Fetch budget exhausted" in m for m in provider.seen[-1])
+    assert any("FETCH budget exhausted" in m for m in provider.seen[-1])
 
 
 async def test_no_fetcher_means_fetch_line_is_a_plain_answer():

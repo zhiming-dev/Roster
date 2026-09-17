@@ -151,6 +151,23 @@ export type TraceItem =
       text: string;
       tone?: "error";
     }
+  | {
+      id: string;
+      kind: "calc";
+      agent: string;
+      role: string;
+      text: string;
+      tone?: "error";
+    }
+  | {
+      id: string;
+      kind: "mcp";
+      agent: string;
+      role: string;
+      phase: "call" | "result" | "error";
+      text: string;
+      tone?: "error";
+    }
   | { id: string; kind: "result"; role: string }
   | { id: string; kind: "critique"; round: number; concern: string; action: string; to: string | null }
   | { id: string; kind: "file"; agent: string; role: string; phase: ToolFilePhase; path?: string; text: string }

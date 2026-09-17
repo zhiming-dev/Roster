@@ -5,9 +5,11 @@
 import type {
   AgentMessageEvent,
   RosterEvent,
+  ToolCalcEvent,
   ToolExecEvent,
   ToolFetchEvent,
   ToolFileEvent,
+  ToolMcpEvent,
   ToolSearchEvent,
 } from "../types/events";
 import type { ActivityItem } from "../types/models";
@@ -123,6 +125,35 @@ function activityFromFetch(evt: ToolFetchEvent): Omit<ActivityItem, "id"> {
   };
 }
 
+function activityFromCalc(evt: ToolCalcEvent): Omit<ActivityItem, "id"> {
+  const body =
+    evt.phase === "result" ? `${evt.expr} = ${evt.result ?? ""}` : `${evt.expr} — ${evt.error ?? "error"}`;
+  return {
+    ts: evt.ts,
+    category: "tool",
+    subkind: evt.phase,
+    from: evt.agent,
+    label: `calc · ${evt.phase}`,
+    role: roleOf(evt.agent),
+    body,
+  };
+}
+
+function activityFromMcp(evt: ToolMcpEvent): Omit<ActivityItem, "id"> {
+  let body = evt.tool;
+  if (evt.phase === "result") body = `${evt.tool} — ${evt.chars ?? 0} chars`;
+  else if (evt.phase === "error") body = `${evt.tool} — ${evt.error ?? "error"}`;
+  return {
+    ts: evt.ts,
+    category: "tool",
+    subkind: evt.phase,
+    from: evt.agent,
+    label: `tool · ${evt.phase}`,
+    role: roleOf(evt.agent),
+    body,
+  };
+}
+
 export function handleEvent(evt: RosterEvent, live = true): void {
   const s = useStore.getState();
   switch (evt.kind) {
@@ -207,6 +238,28 @@ export function handleEvent(evt: RosterEvent, live = true): void {
         s.pushProgress({ kind: "fetch", agent: evt.agent, role: r, phase: "result", text: `${evt.chars ?? 0} chars from ${shortUrl(evt.finalUrl ?? evt.url, 60)}` });
       } else if (evt.phase === "error") {
         s.pushProgress({ kind: "fetch", agent: evt.agent, role: r, phase: "error", text: `failed: ${shortUrl(evt.url, 60)}`, tone: "error" });
+      }
+      break;
+    }
+    case "tool.calc": {
+      s.addActivity(activityFromCalc(evt));
+      const r = roleOf(evt.agent);
+      if (evt.phase === "result") {
+        s.pushProgress({ kind: "calc", agent: evt.agent, role: r, text: `${firstLine(evt.expr, 60)} = ${firstLine(evt.result ?? "", 40)}` });
+      } else {
+        s.pushProgress({ kind: "calc", agent: evt.agent, role: r, text: `calc failed: ${firstLine(evt.error ?? "", 60)}`, tone: "error" });
+      }
+      break;
+    }
+    case "tool.mcp": {
+      s.addActivity(activityFromMcp(evt));
+      const r = roleOf(evt.agent);
+      if (evt.phase === "call") {
+        s.pushProgress({ kind: "mcp", agent: evt.agent, role: r, phase: "call", text: evt.tool });
+      } else if (evt.phase === "result") {
+        s.pushProgress({ kind: "mcp", agent: evt.agent, role: r, phase: "result", text: `${evt.tool} → ${evt.chars ?? 0} chars` });
+      } else {
+        s.pushProgress({ kind: "mcp", agent: evt.agent, role: r, phase: "error", text: `${evt.tool} failed`, tone: "error" });
       }
       break;
     }

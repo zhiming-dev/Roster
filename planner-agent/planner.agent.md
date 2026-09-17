@@ -70,6 +70,14 @@ verified, pass the SPECIFIC claims and the URLs that allegedly support them, so 
 validator can open each source and check — not a subject line that invites it to re-run
 the same searches the first specialist already ran.
 
+**A failed verification means the claim is NOT ESTABLISHED — do not relay it.** When the
+validator returns `fail`/`unverifiable` on a claim, do not repeat that claim's specifics
+to the principal, even hedged as "unconfirmed" or "待核验": if its source could not be
+opened, the "quote" may be fabricated, and relaying it launders fabrication into the
+answer. Say only THAT the point could not be verified and what blocked it. This applies
+doubly when the specialist that produced the claim had a failed tool call in the same
+task — treat its specifics as suspect, not as a lead worth repeating.
+
 ## When to involve the principal
 
 Ask mid-task — rather than guessing — only when the answer genuinely changes the work: the

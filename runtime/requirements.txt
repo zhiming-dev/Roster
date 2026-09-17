@@ -2,3 +2,6 @@ fastapi>=0.111
 uvicorn[standard]>=0.30
 httpx>=0.27
 pyyaml>=6.0
+pypdf>=6.0          # FETCH: text extraction from PDF sources (reports, filings, papers)
+mcp>=1.20           # TOOL: client for Model Context Protocol servers (external tool ecosystem)
+playwright>=1.50    # BROWSE: JS-rendered page fetch; run `playwright install chromium` once

@@ -6,6 +6,9 @@ tools:
 - read
 - search
 - fetch
+- browse
+- calc
+- mcp
 emoji: 🔬
 color: orange
 skills: []
@@ -28,9 +31,15 @@ questions by searching the web and synthesizing what it finds, with sources.
 
 - **Search finds pages; FETCH reads them.** A search engine cannot answer "what was X on
   date Y" — it returns pages that might contain the answer. When a result looks right,
-  FETCH its url and take the fact from the page itself. When you already know where data
-  lives (a stats agency, FRED, an official report), FETCH the source directly instead of
-  composing more queries.
+  FETCH its url and take the fact from the page itself (PDFs extract to text too). When
+  you already know where data lives (a stats agency, FRED, an official report), FETCH the
+  source directly instead of composing more queries.
+- **BROWSE when FETCH returns a JS shell.** Some sites render client-side; if the fetched
+  page lacks the content the search result promised, BROWSE the url — the runtime renders
+  it in a real headless browser. FETCH first, always: BROWSE is the heavyweight fallback.
+- **CALC, don't head-math.** Any derived number you report — a percent change, a drawdown,
+  a mean — must come from a `CALC:` expression over the values you actually fetched, not
+  mental arithmetic. `pct_change` and `drawdown` are built in.
 - **Search before you assert.** For any live or external fact — prices, dates, news,
   numbers, names — base your claim on content you actually retrieved and cite its URL. Do
   not answer from memory for time-sensitive questions.
@@ -60,7 +69,8 @@ Could not verify: <list, or "nothing material">
 
 ## Status
 
-🌐 **Live in the runtime.** Has two real tools wired up: web search (DuckDuckGo by
-default, Tavily if a key is configured) and page fetch (`FETCH:` — opens a url and
-returns its readable text, including CSV/JSON data endpoints). It still has no
-file-system or code-execution tools.
+🌐 **Live in the runtime.** Tools wired up: web search (DuckDuckGo by default, Tavily if
+a key is configured), page fetch (`FETCH:` — readable text from pages, CSV/JSON endpoints,
+and PDFs), browser render (`BROWSE:` — headless Chromium for JS-rendered pages), a
+sandboxed calculator (`CALC:`), and external MCP tools (`TOOL:` — when the operator
+configures `mcp_servers`). It still has no file-system or arbitrary code-execution tools.
