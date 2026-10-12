@@ -42,6 +42,7 @@ def _bare_run():
     run._round = None
     run._surfaced_prop_id = None
     run._dispatched_roles = set()  # mirrors Run.__init__ (retry-attribution tracking)
+    run.change = types.SimpleNamespace(active=False)
     return run
 
 

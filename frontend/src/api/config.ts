@@ -26,6 +26,7 @@ export interface SearchCfg {
 }
 
 export interface TeamConfig {
+  workspace: { target_repo: string };
   agents: AgentCfg[];
   search: SearchCfg;
   available: {
@@ -51,6 +52,7 @@ async function send<T>(url: string, method: string, body?: unknown): Promise<T> 
 type Ok = { ok: boolean; moved?: number };
 
 export const configApi = {
+  updateWorkspace: (target_repo: string) => send<Ok>("/api/config/workspace", "PUT", { target_repo }),
   get: () => send<TeamConfig>("/api/config", "GET"),
   updateAgent: (name: string, patch: Record<string, unknown>) =>
     send<Ok>(`/api/config/agents/${encodeURIComponent(name)}`, "PUT", patch),

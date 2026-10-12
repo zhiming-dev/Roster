@@ -23,7 +23,9 @@ import os
 import shlex
 import signal
 import subprocess
+import tempfile
 import time
+from pathlib import Path
 from dataclasses import dataclass, field
 
 from .boundary import PathEscape, classify_action
@@ -158,16 +160,21 @@ class ToolExecutor:
         timeout_s: int = DEFAULT_TIMEOUT_S,
         max_output: int = MAX_OUTPUT_BYTES,
         max_read: int = MAX_READ_BYTES,
+        capabilities: set[str] | None = None,
     ) -> None:
         self.wt = worktree
         self.timeout_s = timeout_s
         self.max_output = max_output
         self.max_read = max_read
+        self.capabilities = capabilities if capabilities is not None else {"read", "edit", "execute"}
 
     def execute(self, call: ToolCall, *, approved: bool = False) -> ToolResult:
         """Run one tool call. ``approved`` bypasses the auto/gate check (US2 grants it post-approval)."""
         if call.error:
             return ToolResult(call.kind, "error", f"malformed {call.kind} directive", reason=call.error)
+        capability = "execute" if call.kind == "exec" else call.kind
+        if capability not in self.capabilities:
+            return ToolResult(call.kind, "denied", "Capability not granted", reason=f"Missing {capability} permission")
         if call.kind == "read":
             return self._read(call.path or "")
         if call.kind == "edit":
@@ -201,6 +208,9 @@ class ToolExecutor:
             abspath = self.wt.resolve(rel)
         except PathEscape as exc:
             return ToolResult("edit", "denied", f"write denied: {rel}", path=rel, tier="T3", reason=str(exc))
+        normalized = abspath.relative_to(self.wt.path.resolve()).as_posix()
+        if normalized == ".git" or normalized.startswith((".git/", "e2e-agent/e2e-test/test-definitions/", "e2e-agent/e2e-test/suites/")):
+            return ToolResult("edit", "denied", "Protected path", path=rel, reason="Git metadata and supplied test fixtures cannot be edited")
         abspath.parent.mkdir(parents=True, exist_ok=True)
         abspath.write_bytes(body.encode("utf-8"))  # verbatim: preserve the model's LF, no CRLF xlate
         patch = self._file_diff(rel)
@@ -222,6 +232,22 @@ class ToolExecutor:
         """The cumulative change set of the worktree vs its base branch (all files, staged or not)."""
         self._git("add", "-A")
         return self._git("diff", "--cached", self.wt.base_ref).stdout
+
+    def snapshot_patch(self, base_commit: str) -> str:
+        """Capture staged, unstaged and new files without changing the real index."""
+        with tempfile.TemporaryDirectory() as directory:
+            env = {**os.environ, "GIT_INDEX_FILE": str(Path(directory) / "index")}
+            def git(*args: str) -> str:
+                result = subprocess.run(
+                    ["git", "-C", str(self.wt.path), *args], env=env,
+                    capture_output=True, text=True,
+                )
+                if result.returncode:
+                    raise RuntimeError(result.stderr.strip() or "Cannot capture patch")
+                return result.stdout
+            git("read-tree", base_commit)
+            git("add", "-A")
+            return git("diff", "--cached", "--binary", "--full-index", "--no-ext-diff", base_commit)
 
     # -- exec ------------------------------------------------------------------
 

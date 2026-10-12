@@ -19,6 +19,12 @@ interface BaseEvent {
   ts: number;
 }
 
+export interface ChangeStateEvent extends BaseEvent {
+  kind: "change.state";
+  runId: string;
+  change: import("./change").CodeChange;
+}
+
 export interface UserMessageEvent extends BaseEvent {
   kind: "user.message";
   from: string;
@@ -180,6 +186,7 @@ export interface ApprovalResolvedEvent extends BaseEvent {
 }
 
 export type RosterEvent =
+  | ChangeStateEvent
   | UserMessageEvent
   | AgentMessageEvent
   | AgentStatusEvent
@@ -200,6 +207,7 @@ export type RosterEvent =
   | ClarificationAnsweredEvent;
 
 const KNOWN_KINDS = new Set([
+  "change.state",
   "user.message",
   "agent.message",
   "agent.status",

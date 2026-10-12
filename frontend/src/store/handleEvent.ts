@@ -157,6 +157,10 @@ function activityFromMcp(evt: ToolMcpEvent): Omit<ActivityItem, "id"> {
 export function handleEvent(evt: RosterEvent, live = true): void {
   const s = useStore.getState();
   switch (evt.kind) {
+    case "change.state": {
+      if (s.runId === evt.runId) s.setChange(evt.change);
+      break;
+    }
     case "user.message": {
       s.flashEdge("you", "planner");
       s.setAwaitingInput(false); // a new user turn — no longer paused on a question

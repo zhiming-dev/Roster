@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { CodeChange } from "../types/change";
 import type {
   ActivityItem,
   AgentInfo,
@@ -33,6 +34,8 @@ function initialTheme(): ThemePref {
 }
 
 export interface RosterState {
+  change: CodeChange | null;
+  setChange: (change: CodeChange | null) => void;
   // --- data ---
   agents: Record<string, AgentInfo>;
   messages: ChatMessage[];
@@ -82,6 +85,8 @@ export interface RosterState {
 }
 
 export const useStore = create<RosterState>((set) => ({
+  change: null,
+  setChange: (change) => set({ change }),
   agents: {},
   messages: [],
   activity: [],
@@ -148,6 +153,7 @@ export const useStore = create<RosterState>((set) => ({
     set((s) => ({ activeEdges: { ...s.activeEdges, [`${from}|${to}`]: Date.now() } })),
   resetView: () =>
     set({
+      change: null,
       messages: [],
       activity: [],
       unread: 0,

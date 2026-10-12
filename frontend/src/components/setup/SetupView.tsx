@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { configApi, type AgentCfg, type SearchCfg, type TeamConfig } from "../../api/config";
 import styles from "./setup.module.css";
+import { loadInitial } from "../../store/actions";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -16,6 +17,25 @@ function KeyBadge({ status }: { status: AgentCfg["key_status"] }) {
   if (status === "inline")
     return <span className={`${styles.badge} ${styles.badgeWarn}`}>key inline ⚠</span>;
   return <span className={`${styles.badge} ${styles.badgeNone}`}>no key</span>;
+}
+
+function WorkspaceEditor({ target, onSaved }: { target: string; onSaved: () => Promise<void> }) {
+  const [value, setValue] = useState(target);
+  const [error, setError] = useState("");
+  const save = async () => {
+    try {
+      setError("");
+      await configApi.updateWorkspace(value);
+      await onSaved();
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+  };
+  return <section className={styles.section}>
+    <h3>Code change workspace</h3>
+    <p>Choose a clean Git repository, save, then apply to a new chat.</p>
+    <Field label="Target repository"><input value={value} onChange={(e) => setValue(e.target.value)} placeholder="Absolute repository path" /></Field>
+    {error && <p role="alert">{error}</p>}
+    <button className={styles.primary} onClick={() => void save()}>Save workspace</button>
+  </section>;
 }
 
 function SearchEditor({
@@ -90,7 +110,7 @@ function AgentEditor({
 
   const save = async () => {
     try {
-      const tools = search ? ["search"] : [];
+      const tools = [...(agent?.tools ?? []).filter((tool) => tool !== "search"), ...(search ? ["search"] : [])];
       const options = { temperature: Number(temperature), max_tokens: Number(maxTokens) };
       const key = apiKey ? { api_key: apiKey } : {};
       const ident = { emoji, color, skills };
@@ -217,8 +237,11 @@ export function SetupView({ onClose }: { onClose: () => void }) {
   }, []);
 
   const apply = async () => {
-    await configApi.reset();
-    setMsg("Applied — a new chat now uses the updated team.");
+    try {
+      await configApi.reset();
+      await loadInitial();
+      setMsg("Applied. A new chat now uses the updated team and workspace.");
+    } catch (e) { setMsg(e instanceof Error ? e.message : String(e)); }
   };
   const migrate = async () => {
     const r = await configApi.migrateKeys();
@@ -250,6 +273,7 @@ export function SetupView({ onClose }: { onClose: () => void }) {
         <p className="muted">Loading…</p>
       ) : (
         <>
+          <WorkspaceEditor target={cfg.workspace?.target_repo ?? ""} onSaved={load} />
           {cfg.inline_keys > 0 && (
             <div className={styles.warn}>
               ⚠ {cfg.inline_keys} API key(s) are stored inline (plaintext) in your config.

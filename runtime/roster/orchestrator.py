@@ -35,6 +35,7 @@ from .search import SearchProvider, build_search_provider
 from .task_result import build_task_result, new_task_id, write_diff_artifact, write_task_result
 from .tools import ApprovalPending, ToolExecutor
 from .workspace import Worktree, WorkspaceError, WorkspaceManager
+from .workflow import ChangeWorkflow
 
 log = logging.getLogger("roster.orchestrator")
 
@@ -609,7 +610,7 @@ class Run:
         def _executor_for(agent_cfg: Any) -> ToolExecutor | None:
             if self._worktree is None or not wants_file_tools(agent_cfg.tools):
                 return None
-            return ToolExecutor(self._worktree)
+            return ToolExecutor(self._worktree, capabilities=set(agent_cfg.tools))
 
         # Specialist metadata for the planner's (dynamic) dispatch menu.
         specialists: list[SpecialistCaps] = []
@@ -700,6 +701,8 @@ class Run:
             sorted(require) or "<none>",
             self.search_provider.name if self.search_provider else "disabled",
         )
+
+        self.change = ChangeWorkflow(self)
 
     def all_agents(self) -> list[Agent]:
         return [self.planner, *self.subagents.values()]
@@ -951,6 +954,8 @@ class Run:
     async def _apply_decision(self, pending: PendingApproval, decision: str) -> TurnResult:
         """Execute (approve) or abandon (reject) the gated action, resume the paused
         specialist's turn, and — once no approvals remain — complete the frozen round."""
+        if self.change.active:
+            await self.change.transition("coding", "Resuming the approved task")
         self.pending_approvals.pop(0)
         self._surfaced_prop_id = None
         record_decision(runs_dir(), self.run_id, pending.prop_id, decision)
@@ -982,6 +987,8 @@ class Run:
             # head of the queue (its turn is still the one in flight).
             new_pending = await self._register_pending(subagent, ap)
             self.pending_approvals.insert(0, new_pending)
+            if self.change.active:
+                await self.change.wait_for_action()
             return await self._surface_approval(new_pending)
         except Exception as exc:  # noqa: BLE001 — a failure is a result, not a crash
             reason = str(exc) if isinstance(exc, ProviderError) else f"{type(exc).__name__}: {exc}"
@@ -996,8 +1003,13 @@ class Run:
                 self._round.failed.append(role)
         else:
             await self._record_task_result(subagent, sub_reply)
+            if self.change.active:
+                return await self.change.after_coder(sub_reply)
             if self._round is not None:
                 self._round.parts.append(f"[{role} reports]:\n{sub_reply}")
+
+        if self.change.active:
+            return await self.change.block("Coder could not resume. Inspect the activity log and start a new change.")
 
         if self.pending_approvals:
             return await self._surface_approval(self.pending_approvals[0])
@@ -1086,6 +1098,8 @@ class Run:
     async def handle_principal_message(self, user_text: str) -> TurnResult:
         # A run paused at the approval gate treats THIS message as the decision; a run paused
         # on a planner clarification treats it as the answer. Otherwise it starts fresh.
+        if self.change.active and self.change.phase != "action":
+            return TurnResult("awaiting_input", "Use the code change panel to review the plan or diff.")
         awaiting_approval = self.orch_state.awaiting_input and bool(self.pending_approvals)
         resuming_ask = self.orch_state.awaiting_input and not awaiting_approval
 

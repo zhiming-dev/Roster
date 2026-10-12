@@ -16,12 +16,11 @@ local Ollama daemon or Azure AI Foundry, and exposes:
   reopen past chats from the sidebar and continue them.
 - An **append-only provenance log** at `../runs/<runId>/provenance.jsonl`.
 
-> This is an MVP. **Web search is wired up** (the Researcher and QA agents can really
-> query the web), but most other tools are not yet — the Coder doesn't edit files and the
-> E2E agent doesn't drive a real browser inside the runtime. What *is* wired up is the
-> end-to-end **architecture**: per-agent provider binding, planner-only HITL surface,
-> dispatch protocol, the shared LLM queue, and full observability. More tool execution is
-> the next phase.
+> The **Code change** view now supports plan approval, real Coder edits in a Git worktree,
+> independent Reviewer checks, execution of an approved test command, human diff review
+> and an applicable patch download. See [the workflow guide](../WORKFLOW.md) for setup
+> and recovery behavior. The general chat interface remains separate. Command execution
+> uses local subprocesses; an operating system sandbox is not included.
 
 ---
 
@@ -354,8 +353,8 @@ that slow. Reduce `system_prompt_max_chars`, switch to a smaller model, or raise
 | Feature | Status | Where it goes next |
 |---|---|---|
 | Web search tool | ✅ DuckDuckGo (no key) / Tavily | More backends (Bing, Brave, Azure grounding) behind the same `SearchProvider`. |
-| Real tool execution (file edits, shell, browser) | ❌ | Sub-agents need a sandboxed tool layer. Coder talks about edits but doesn't make them. |
-| Approval Gate UI | ❌ (logged only) | T3/T4 dispatches should pop a confirm in the dashboard before the sub-agent is called. |
+| Real tool execution | File edits, commands, browser reads and MCP are implemented | Operating system isolation and the dedicated E2E runner remain future work. |
+| Approval UI | Code change includes plan, action and diff decisions | See the workflow guide for the guaranteed path. |
 | Streaming responses | ❌ | Ollama supports it; swap `stream=False` and pipe chunks over the WebSocket. |
 | Council deliberation | ❌ | Wire a `convene_council()` path that fans the same prompt to multiple providers. |
 | Cloud providers | ✅ Azure AI Foundry / Azure OpenAI | Add OpenAI / Anthropic / Gemini behind the same `Provider` protocol in `providers/`. |

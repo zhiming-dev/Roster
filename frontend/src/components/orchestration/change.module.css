@@ -1,0 +1,19 @@
+.panel { flex: 1; overflow: auto; padding: 1.5rem; width: 100%; max-width: 1100px; margin: 0 auto; }
+.panel h2 { margin: 0; }
+.panel p { line-height: 1.6; }
+.panel label { display: grid; gap: .5rem; margin: 1rem 0; font-weight: 600; }
+.panel input, .panel textarea { width: 100%; padding: .75rem; border: 1px solid currentColor; border-radius: .5rem; background: transparent; color: inherit; font: inherit; }
+.panel button, .delivery a { padding: .65rem 1rem; border: 1px solid currentColor; border-radius: .5rem; background: transparent; color: inherit; font: inherit; cursor: pointer; }
+.panel button:disabled { opacity: .5; cursor: default; }
+.panel pre { white-space: pre-wrap; overflow-wrap: anywhere; padding: 1rem; background: rgba(128,128,128,.1); border-radius: .5rem; }
+.panel details { margin: 1rem 0; }
+.panel summary { cursor: pointer; font-weight: 600; }
+.panel li { margin: .5rem 0; }
+.steps { display: flex; flex-wrap: wrap; gap: 1.5rem; padding-left: 1.2rem; }
+.steps [aria-current] { font-weight: 800; text-decoration: underline; }
+.actions { display: flex; flex-wrap: wrap; gap: .75rem; margin: 1.5rem 0; }
+.actions p, .actions pre { flex-basis: 100%; }
+.error { color: #b42318; }
+.text { white-space: pre-wrap; }
+.delivery { padding: 1rem 0; }
+.panel :focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }

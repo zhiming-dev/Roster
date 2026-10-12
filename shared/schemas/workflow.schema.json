@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://conclave.dev/schemas/v1/workflow.schema.json",
+  "title": "CodeChangeWorkflow",
+  "type": "object",
+  "required": ["id", "runId", "phase", "goal", "testCommand", "baseCommit", "coder", "reviewer", "message", "updatedAt"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^change_[a-f0-9]+$"},
+    "runId": {"type": "string", "pattern": "^run_[A-Za-z0-9_-]+$"},
+    "phase": {"enum": ["planning", "plan", "coding", "action", "reviewing", "testing", "diff", "delivered", "rejected", "blocked"]},
+    "goal": {"type": "string", "minLength": 1},
+    "testCommand": {"type": "string", "minLength": 1},
+    "baseCommit": {"type": "string", "pattern": "^[a-f0-9]{40,64}$"},
+    "coder": {"type": "string"},
+    "reviewer": {"type": "string"},
+    "message": {"type": "string"},
+    "updatedAt": {"type": "string", "format": "date-time"},
+    "plan": {"$ref": "https://conclave.dev/schemas/plan.schema.json"},
+    "gateId": {"type": "string"},
+    "patch": {"type": "string"},
+    "patchHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "coderReport": {"type": "string"},
+    "review": {"type": "string"},
+    "testResult": {"type": "object"},
+    "downloadUrl": {"type": "string"},
+    "pending": {"type": "object"},
+    "coderHistory": {"type": "array", "items": {"type": "object"}}
+  },
+  "additionalProperties": false
+}

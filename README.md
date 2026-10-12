@@ -90,6 +90,11 @@ Roster/                              ← repo root
 
 ## What's built vs. what's planned
 
+The runtime now includes a **Code change** workflow with plan approval, sequential Coder and
+Reviewer execution, an explicit test command, human diff approval and patch download.
+See [the workflow guide](./WORKFLOW.md) for setup, validation and current boundaries.
+The older phase table below describes the broader framework roadmap.
+
 | Phase | Milestone | Status |
 |---|---|---|
 | 0 | Playwright E2E agent (standalone) | ✅ in [`e2e-agent/`](./e2e-agent/) |

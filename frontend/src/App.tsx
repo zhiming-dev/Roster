@@ -6,6 +6,7 @@ import { ChatView } from "./components/chat/ChatView";
 import { Composer } from "./components/chat/Composer";
 import { LineageGraph } from "./components/lineage/LineageGraph";
 import { ClarificationPrompt } from "./components/orchestration/ClarificationPrompt";
+import { ChangePanel } from "./components/orchestration/ChangePanel";
 import { SetupView } from "./components/setup/SetupView";
 import { Sidebar } from "./components/Sidebar";
 import { loadInitial } from "./store/actions";
@@ -26,7 +27,7 @@ export function App() {
   const unread = useStore((s) => s.unread);
   const clearUnread = useStore((s) => s.clearUnread);
   const [activityOpen, setActivityOpen] = useState(false);
-  const [view, setView] = useState<"chat" | "setup">("chat");
+  const [view, setView] = useState<"chat" | "setup" | "change">("chat");
 
   useWebSocket({ onEvent: (e) => handleEvent(e, true), onConnection: setConnection });
 
@@ -70,6 +71,9 @@ export function App() {
             ⚙ Setup
           </button>
           <span className="spacer" />
+          <button className={`activity-toggle ${view === "change" ? "on" : ""}`} onClick={() => setView((v) => v === "change" ? "chat" : "change")}>
+            Code change
+          </button>
           {view === "chat" && (
             <button
               className={`activity-toggle ${activityOpen ? "on" : ""}`}
@@ -83,6 +87,8 @@ export function App() {
 
         {view === "setup" ? (
           <SetupView onClose={() => setView("chat")} />
+        ) : view === "change" ? (
+          <><LineageGraph /><ChangePanel /></>
         ) : (
           <>
             <LineageGraph />

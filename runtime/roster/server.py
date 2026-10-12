@@ -6,6 +6,9 @@ import asyncio
 import json
 import logging
 import os
+import hashlib
+import re
+from functools import wraps
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -19,6 +22,8 @@ from .bus import bus
 from .orchestrator import Run
 from .providers import ProviderError
 from .store import Store, db_path
+from .provenance import runs_dir
+from .workflow import validate
 
 log = logging.getLogger("roster.server")
 
@@ -47,6 +52,18 @@ _run: Run | None = None
 _run_lock = asyncio.Lock()
 _store: Store | None = None
 _persist_task: asyncio.Task[None] | None = None
+_operation_lock = asyncio.Lock()
+
+
+def exclusive(operation):
+    """Reject overlapping mutations rather than running an approval twice."""
+    @wraps(operation)
+    async def wrapped(*args, **kwargs):
+        if _operation_lock.locked():
+            return JSONResponse({"error": "A task is running. Wait for it to pause or finish"}, status_code=409)
+        async with _operation_lock:
+            return await operation(*args, **kwargs)
+    return wrapped
 
 
 def _get_config_path() -> str:
@@ -241,6 +258,7 @@ async def agents() -> JSONResponse:
 
 
 @app.post("/api/chat")
+@exclusive
 async def chat(payload: dict[str, Any]) -> JSONResponse:
     text = (payload.get("message") or "").strip()
     if not text:
@@ -275,6 +293,7 @@ async def chat(payload: dict[str, Any]) -> JSONResponse:
 
 
 @app.post("/api/approvals/{prop_id}")
+@exclusive
 async def resolve_approval(prop_id: str, payload: dict[str, Any]) -> JSONResponse:
     """Decide the surfaced boundary proposal (spec 004, US2/T019).
 
@@ -317,6 +336,7 @@ async def resolve_approval(prop_id: str, payload: dict[str, Any]) -> JSONRespons
 
 
 @app.post("/api/reset")
+@exclusive
 async def reset() -> JSONResponse:
     global _run
     async with _run_lock:
@@ -351,6 +371,7 @@ async def get_conversation(conv_id: str) -> JSONResponse:
 
 
 @app.post("/api/conversations/{conv_id}/activate")
+@exclusive
 async def activate_conversation(conv_id: str) -> JSONResponse:
     """Reopen a persisted conversation: rebind it as the live run (restoring the
     planner's history) and return its events so the dashboard can replay them."""
@@ -375,6 +396,7 @@ async def activate_conversation(conv_id: str) -> JSONResponse:
 
 
 @app.delete("/api/conversations/{conv_id}")
+@exclusive
 async def delete_conversation(conv_id: str) -> JSONResponse:
     """Delete a conversation. If it was the live run, start a fresh one."""
     global _run
@@ -390,6 +412,63 @@ async def delete_conversation(conv_id: str) -> JSONResponse:
     return JSONResponse({"ok": True, "active": _run.run_id if _run is not None else None})
 
 
+@app.get("/api/change")
+async def get_change() -> JSONResponse:
+    run = await _ensure_run()
+    approval = run.pending_approvals[0] if run.pending_approvals else None
+    return JSONResponse({
+        "runId": run.run_id, "change": run.change.public(),
+        "workspaceReady": run._worktree is not None,
+        "workspaceError": run.workspace_error,
+        "approval": {
+            "propId": approval.prop_id, "agent": approval.agent,
+            "tier": approval.tier, "action": approval.action_text, "summary": approval.reason,
+        } if approval else None,
+    })
+
+
+@app.post("/api/change")
+@exclusive
+async def start_change(payload: dict[str, Any]) -> JSONResponse:
+    run = await _ensure_run()
+    try:
+        result = await run.change.start(str(payload.get("goal") or ""), str(payload.get("testCommand") or ""))
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return JSONResponse({"status": result.status, "runId": run.run_id, "change": run.change.public()})
+
+
+@app.post("/api/change/{gate_id}")
+@exclusive
+async def decide_change(gate_id: str, payload: dict[str, Any]) -> JSONResponse:
+    run = await _ensure_run()
+    try:
+        result = await run.change.decide(gate_id, str(payload.get("decision") or ""))
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=409)
+    return JSONResponse({"status": result.status, "runId": run.run_id, "change": run.change.public()})
+
+
+@app.get("/api/changes/{run_id}/patch")
+async def download_patch(run_id: str) -> Response:
+    if not re.fullmatch(r"run_[A-Za-z0-9_-]+", run_id):
+        return JSONResponse({"error": "Unknown run"}, status_code=404)
+    root = runs_dir() / run_id / "change"
+    try:
+        state = json.loads((root / "workflow.json").read_text(encoding="utf-8"))
+        validate(state, "workflow.schema.json")
+        if state["runId"] != run_id or state["phase"] != "delivered":
+            raise ValueError("Patch has not been approved")
+        content = (root / "delivery.patch").read_bytes()
+        if hashlib.sha256(content).hexdigest() != state["patchHash"]:
+            raise ValueError("Patch integrity check failed")
+    except (OSError, ValueError, KeyError):
+        return JSONResponse({"error": "Approved patch unavailable"}, status_code=404)
+    return Response(content, media_type="text/x-diff", headers={
+        "Content-Disposition": 'attachment; filename="change.patch"',
+    })
+
+
 # ---- Team configuration (spec 003) ------------------------------------------------
 # File-based: edits agents.config.yaml + each agent's .agent.md, with secrets in .env.
 # Changes apply to NEW chats — the client calls /api/reset to rebuild the run.
@@ -398,6 +477,15 @@ async def delete_conversation(conv_id: str) -> JSONResponse:
 @app.get("/api/config")
 async def get_config() -> JSONResponse:
     return JSONResponse(config_api.editable_config())
+
+
+@app.put("/api/config/workspace")
+async def put_workspace(payload: dict[str, Any]) -> JSONResponse:
+    try:
+        config_api.update_workspace(payload)
+    except ValueError as exc:
+        return JSONResponse({"error": str(exc)}, status_code=400)
+    return JSONResponse({"ok": True})
 
 
 @app.put("/api/config/agents/{name}")

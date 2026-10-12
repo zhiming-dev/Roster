@@ -26,6 +26,7 @@ TOOL_FILE = "tool.file"  # phase: "read" | "write" | "diff"
 TOOL_EXEC = "tool.exec"  # phase: "command" | "output"
 APPROVAL_REQUESTED = "approval.requested"
 APPROVAL_RESOLVED = "approval.resolved"
+CHANGE_STATE = "change.state"  # runId, change: public CodeChangeWorkflow snapshot
 
 
 async def emit_plan_proposed(run_id: str, summary: str, tasks: list[dict[str, Any]]) -> None:

@@ -149,6 +149,7 @@ def editable_config() -> dict[str, Any]:
     search_key = "env" if os.environ.get("TAVILY_API_KEY") else _key_status(s.get("api_key"))
     return {
         "agents": agents,
+        "workspace": {"target_repo": (raw.get("workspace") or {}).get("target_repo") or os.environ.get("ROSTER_TARGET_REPO", "")},
         "search": {
             "enabled": bool(s.get("enabled", True)),
             "provider": s.get("provider", "auto"),
@@ -281,6 +282,15 @@ def update_search(patch: dict[str, Any]) -> None:
             s[field] = patch[field]
     if patch.get("api_key"):
         set_env("TAVILY_API_KEY", str(patch["api_key"]))
+    _dump_raw(raw)
+
+
+def update_workspace(patch: dict[str, Any]) -> None:
+    target = str(patch.get("target_repo") or "").strip()
+    if target and (not Path(target).is_absolute() or not Path(target).is_dir()):
+        raise ValueError("Choose an existing repository using its absolute path")
+    raw = _load_raw()
+    raw.setdefault("workspace", {})["target_repo"] = target or None
     _dump_raw(raw)
 
 
